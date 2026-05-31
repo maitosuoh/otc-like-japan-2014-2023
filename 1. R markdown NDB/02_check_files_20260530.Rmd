@@ -1,0 +1,58 @@
+---
+title: "NDB"
+output: html_document
+date: "2026-05-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+# create directories
+
+dir.create("../xlsx", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+dir.create("../xlsx/oral", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+
+dir.create("../xlsx/oral/inpt_dem", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+dir.create("../xlsx/oral/inpt_prf", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+
+dir.create("../xlsx/oral/outpt_inpr_dem", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+dir.create("../xlsx/oral/outpt_inpr_prf", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+
+dir.create("../xlsx/oral/outpt_outpr_dem", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+dir.create("../xlsx/oral/outpt_outpr_prf", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+```
+
+```{r}
+list.files("../xlsx")
+```
+
+```{r}
+list.files("../xlsx/oral")
+```
+
+```{r}
+folder_name <- list.files("../xlsx/oral")
+
+folder_path <- paste0("../xlsx/oral/", folder_name)
+```
+
+```{r}
+for ( i in 1:length(folder_name)){
+  x <- list.files(folder_path[i])
+  assign(folder_name[i], x)
+}
+```
+
+```{r}
+map(folder_path, list.files) %>% unlist() %>% unique() %>% length()
+```
+```{r}
+
+```
+

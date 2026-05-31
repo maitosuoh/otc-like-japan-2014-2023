@@ -1,0 +1,323 @@
+---
+title: "Drugs"
+output: html_document
+date: "2026-05-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+# create directories
+
+dir.create("../xlsx/drug", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+
+dir.create("../xlsx/drug/oral", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+
+dir.create("../xlsx/drug/inj", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+
+dir.create("../xlsx/drug/ext", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+
+dir.create("../xlsx/drug/other", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+```
+
+
+```{r}
+# drug name list for 2025
+
+# oral
+
+# 2025
+# https://www.mhlw.go.jp/topics/2024/04/xls/tp20250201-01_01.xlsx
+
+# 2024
+# https://www.mhlw.go.jp/topics/2023/04/xls/tp20240201-01_01.xlsx
+
+# 2023
+# https://www.mhlw.go.jp/topics/2022/04/xls/tp20230315-01_01.xlsx
+
+# 2022
+# https://www.mhlw.go.jp/topics/2021/04/xls/tp20220201-01_01.xlsx
+
+# 2021
+# https://www.mhlw.go.jp/topics/2020/04/xls/tp20210218-01_01.xlsx
+
+# 2020
+# https://www.mhlw.go.jp/topics/2019/08/xls/tp20200122-01_01.xls
+
+# 2019
+# https://www.mhlw.go.jp/topics/2018/04/xls/tp20190904-01_01.xls
+
+# 2018 H30
+# https://www.mhlw.go.jp/topics/2018/03/xls/tp20180314-01_1.xls
+
+# 2016 H28
+# https://www.mhlw.go.jp/topics/2015/03/xls/tp20151211-01_1.xls
+
+# 2014 H26
+# https://www.mhlw.go.jp/topics/2012/03/xls/tp140203-01_1.xls
+
+
+
+
+url_drug_oral <- c("https://www.mhlw.go.jp/topics/2024/04/xls/tp20250201-01_01.xlsx",
+              "https://www.mhlw.go.jp/topics/2023/04/xls/tp20240201-01_01.xlsx",
+              "https://www.mhlw.go.jp/topics/2022/04/xls/tp20230315-01_01.xlsx",
+              "https://www.mhlw.go.jp/topics/2021/04/xls/tp20220201-01_01.xlsx",
+              "https://www.mhlw.go.jp/topics/2020/04/xls/tp20210218-01_01.xlsx",
+              "https://www.mhlw.go.jp/topics/2019/08/xls/tp20200122-01_01.xls",
+              "https://www.mhlw.go.jp/topics/2018/04/xls/tp20190904-01_01.xls",
+              "https://www.mhlw.go.jp/topics/2018/03/xls/tp20180314-01_1.xls",
+              "https://www.mhlw.go.jp/topics/2015/03/xls/tp20151211-01_1.xls",
+              "https://www.mhlw.go.jp/topics/2012/03/xls/tp140203-01_1.xls")
+
+```
+
+```{r}
+file_drug_oral <- url_drug_oral %>% str_extract("(?<=\\/xls\\/).+$")
+
+path_drug_oral <- paste0("../xlsx/drug/oral/", file_drug_oral)
+```
+
+```{r}
+for (i in 1:length(url_drug_oral)){
+  download.file(url_drug_oral[i], path_drug_oral[i], mode = "wb")
+  print(paste(file_drug_oral[i], "downloaded"))
+}
+```
+
+
+
+```{r}
+# injection
+
+# 2025
+# https://www.mhlw.go.jp/topics/2024/04/xls/tp20250201-01_02.xlsx
+
+# 2024
+# https://www.mhlw.go.jp/topics/2023/04/xls/tp20240201-01_02.xlsx
+
+# 2023
+# https://www.mhlw.go.jp/topics/2022/04/xls/tp20230315-01_02.xlsx
+
+# 2022
+# https://www.mhlw.go.jp/topics/2021/04/xls/tp20211210-01_02.xlsx
+
+# 2021
+# https://www.mhlw.go.jp/topics/2020/04/xls/tp20210218-01_02.xlsx
+
+# 2020
+# https://www.mhlw.go.jp/topics/2019/08/xls/tp20200201-01_02.xls
+
+# 2019
+# https://www.mhlw.go.jp/topics/2018/04/xls/tp20190904-01_02.xls
+
+# 2018
+# https://www.mhlw.go.jp/topics/2017/12/xls/tp20171208-01_2.xls
+
+# 2016
+# https://www.mhlw.go.jp/topics/2015/03/xls/tp20151211-01_2.xls
+
+# 2014
+# https://www.mhlw.go.jp/topics/2012/03/xls/tp140203-01_2.xls
+
+
+url_drug_inj <- c("https://www.mhlw.go.jp/topics/2024/04/xls/tp20250201-01_02.xlsx",
+              "https://www.mhlw.go.jp/topics/2023/04/xls/tp20240201-01_02.xlsx",
+              "https://www.mhlw.go.jp/topics/2022/04/xls/tp20230315-01_02.xlsx",
+              "https://www.mhlw.go.jp/topics/2021/04/xls/tp20211210-01_02.xlsx",
+              "https://www.mhlw.go.jp/topics/2020/04/xls/tp20210218-01_02.xlsx",
+              "https://www.mhlw.go.jp/topics/2019/08/xls/tp20200201-01_02.xls",
+              "https://www.mhlw.go.jp/topics/2018/04/xls/tp20190904-01_02.xls",
+              "https://www.mhlw.go.jp/topics/2017/12/xls/tp20171208-01_2.xls",
+              "https://www.mhlw.go.jp/topics/2015/03/xls/tp20151211-01_2.xls",
+              "https://www.mhlw.go.jp/topics/2012/03/xls/tp140203-01_2.xls")
+```
+
+```{r}
+file_drug_inj <- url_drug_inj %>% str_extract("(?<=\\/xls\\/).+$")
+
+path_drug_inj <- paste0("../xlsx/drug/inj/", file_drug_inj)
+```
+
+```{r}
+for (i in 1:length(url_drug_inj)){
+  download.file(url_drug_inj[i], path_drug_inj[i], mode = "wb")
+  print(paste(file_drug_inj[i], "downloaded"))
+}
+```
+
+
+```{r}
+# ext
+
+# 2025
+# https://www.mhlw.go.jp/topics/2024/04/xls/tp20241206-01_03.xlsx
+
+# 2024
+# https://www.mhlw.go.jp/topics/2023/04/xls/tp20240201-01_03.xlsx
+
+# 2023
+# https://www.mhlw.go.jp/topics/2022/04/xls/tp20230315-01_03.xlsx
+
+# 2022
+# https://www.mhlw.go.jp/topics/2021/04/xls/tp20211210-01_03.xlsx
+
+# 2021
+# https://www.mhlw.go.jp/topics/2020/04/xls/tp20210218-01_03.xlsx
+
+# 2020
+# https://www.mhlw.go.jp/topics/2019/08/xls/tp20200122-01_03.xls
+
+
+# 2019
+# https://www.mhlw.go.jp/topics/2018/04/xls/tp20190904-01_03.xls
+
+# 2018
+# https://www.mhlw.go.jp/topics/2017/12/xls/tp20171208-01_3.xls
+
+# 2016
+# https://www.mhlw.go.jp/topics/2015/03/xls/tp20151211-01_3.xls
+
+
+# 2014
+# https://www.mhlw.go.jp/topics/2012/03/xls/tp140203-01_3.xls
+
+
+url_drug_ext <- c("https://www.mhlw.go.jp/topics/2024/04/xls/tp20241206-01_03.xlsx",
+                  "https://www.mhlw.go.jp/topics/2023/04/xls/tp20240201-01_03.xlsx",
+                  "https://www.mhlw.go.jp/topics/2022/04/xls/tp20230315-01_03.xlsx",
+                  "https://www.mhlw.go.jp/topics/2021/04/xls/tp20211210-01_03.xlsx",
+                  "https://www.mhlw.go.jp/topics/2020/04/xls/tp20210218-01_03.xlsx",
+                  "https://www.mhlw.go.jp/topics/2019/08/xls/tp20200122-01_03.xls",
+                  "https://www.mhlw.go.jp/topics/2018/04/xls/tp20190904-01_03.xls",
+                  "https://www.mhlw.go.jp/topics/2017/12/xls/tp20171208-01_3.xls",
+                  "https://www.mhlw.go.jp/topics/2015/03/xls/tp20151211-01_3.xls",
+                  "https://www.mhlw.go.jp/topics/2012/03/xls/tp140203-01_3.xls")
+
+```
+
+```{r}
+file_drug_ext <- url_drug_ext %>% str_extract("(?<=\\/xls\\/).+$")
+
+path_drug_ext <- paste0("../xlsx/drug/ext/", file_drug_ext)
+```
+
+```{r}
+for (i in 1:length(url_drug_ext)){
+  download.file(url_drug_ext[i], path_drug_ext[i], mode = "wb")
+  print(paste(file_drug_ext[i], "downloaded"))
+}
+```
+
+```{r}
+# others
+
+# 2025
+# https://www.mhlw.go.jp/topics/2024/04/xls/tp20250201-01_05.xlsx
+
+# 2024
+# https://www.mhlw.go.jp/topics/2023/04/xls/tp20240201-01_05.xlsx
+
+# 2023
+# https://www.mhlw.go.jp/topics/2022/04/xls/tp20230315-01_05.xlsx
+
+# 2022
+# https://www.mhlw.go.jp/topics/2021/04/xls/tp20220201-01_05.xlsx
+
+
+# 2021
+# https://www.mhlw.go.jp/topics/2020/04/xls/tp20210218-01_05.xlsx
+
+# 2020
+# https://www.mhlw.go.jp/topics/2019/08/xls/tp20200122-01_05.xls
+
+# 2019
+# https://www.mhlw.go.jp/topics/2018/04/xls/tp20190904-01_05.xls
+
+# 2018
+# https://www.mhlw.go.jp/topics/2018/03/xls/tp20180314-01_5.xls
+
+# 2016
+# https://www.mhlw.go.jp/topics/2015/03/xls/tp20151211-01_5.xls
+
+# 2014
+# https://www.mhlw.go.jp/topics/2012/03/xls/tp140319-01_5.xls
+
+
+url_drug_oth <- c("https://www.mhlw.go.jp/topics/2024/04/xls/tp20250201-01_05.xlsx",
+                  "https://www.mhlw.go.jp/topics/2023/04/xls/tp20240201-01_05.xlsx",
+                  "https://www.mhlw.go.jp/topics/2022/04/xls/tp20230315-01_05.xlsx",
+                  "https://www.mhlw.go.jp/topics/2021/04/xls/tp20220201-01_05.xlsx",
+                  "https://www.mhlw.go.jp/topics/2020/04/xls/tp20210218-01_05.xlsx",
+                  "https://www.mhlw.go.jp/topics/2019/08/xls/tp20200122-01_05.xls",
+                  "https://www.mhlw.go.jp/topics/2018/04/xls/tp20190904-01_05.xls",
+                  "https://www.mhlw.go.jp/topics/2018/03/xls/tp20180314-01_5.xls",
+                  "https://www.mhlw.go.jp/topics/2015/03/xls/tp20151211-01_5.xls",
+                  "https://www.mhlw.go.jp/topics/2012/03/xls/tp140319-01_5.xls")
+
+```
+
+
+```{r}
+file_drug_oth <- url_drug_ext %>% str_extract("(?<=\\/xls\\/).+$")
+
+path_drug_oth <- paste0("../xlsx/drug/oth/", file_drug_ext)
+```
+
+```{r}
+for (i in 1:length(url_drug_oth)){
+  download.file(url_drug_oth[i], path_drug_oth[i], mode = "wb")
+  print(paste(file_drug_oth[i], "downloaded"))
+}
+```
+
+
+```{r}
+# drug name list for 2024
+
+# oral
+# "https://www.mhlw.go.jp/topics/2024/04/xls/tp20250201-01_01.xlsx",
+
+
+# inj
+# "https://www.mhlw.go.jp/topics/2024/04/xls/tp20250201-01_02.xlsx",
+#
+
+# ext
+# "https://www.mhlw.go.jp/topics/2024/04/xls/tp20241206-01_03.xlsx",
+
+# dent
+# "https://www.mhlw.go.jp/topics/2024/04/xls/tp20241120-01_04.xlsx",
+#
+
+# other
+# "https://www.mhlw.go.jp/topics/2024/04/xls/tp20250201-01_05.xlsx",
+#
+
+
+url_drug <- c("https://www.mhlw.go.jp/topics/2024/04/xls/tp20250201-01_01.xlsx",
+              "https://www.mhlw.go.jp/topics/2024/04/xls/tp20250201-01_02.xlsx",
+              "https://www.mhlw.go.jp/topics/2024/04/xls/tp20241206-01_03.xlsx",
+              "https://www.mhlw.go.jp/topics/2024/04/xls/tp20241120-01_04.xlsx",
+              "https://www.mhlw.go.jp/topics/2024/04/xls/tp20250201-01_05.xlsx")
+
+```
+
+```{r}
+file_drug <- url_drug %>% str_extract("(?<=\\/xls\\/).+\\.xlsx")
+
+path_drug <- paste0("../xlsx/drug/", file_drug)
+```
+
+```{r}
+for (i in 1:length(url_drug)){
+  download.file(url_drug[i], path_drug[i], mode = "wb")
+  print(paste(file_drug[i], "downloaded"))
+}
+```

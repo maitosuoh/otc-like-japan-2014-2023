@@ -1,0 +1,167 @@
+---
+title: "NDB"
+output: html_document
+date: "2026-05-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(openxlsx)
+```
+
+# ext dem
+
+```{r}
+ext_dem <- list.files("../rds/ext/dem")
+
+ext_dem
+```
+
+```{r}
+# get folder names
+
+ext_dem_1 <- ext_dem %>% str_subset("dem_1")
+
+ext_dem_2 <- ext_dem %>% str_subset("dem_2")
+```
+
+```{r}
+# combine dem_1
+
+df_ext_dem_1 <- map(paste0("../rds/ext/dem/", ext_dem_1), readRDS) %>% list_rbind()
+```
+
+```{r}
+# combine dem_2
+
+df_ext_dem_2 <- map(paste0("../rds/ext/dem/", ext_dem_2), readRDS) %>% list_rbind()
+```
+
+# ext prf
+
+```{r}
+ext_prf <- list.files("../rds/ext/prf")
+
+ext_prf
+```
+
+```{r}
+# get folder names
+
+ext_prf_1 <- ext_prf %>% str_subset("prf_1")
+
+ext_prf_2 <- ext_prf %>% str_subset("prf_2")
+```
+
+```{r}
+# combine dem_1
+
+df_ext_prf_1 <- map(paste0("../rds/ext/prf/", ext_prf_1), readRDS) %>% list_rbind()
+```
+
+```{r}
+# combine dem_2
+
+df_ext_prf_2 <- map(paste0("../rds/ext/prf/", ext_prf_2), readRDS) %>% list_rbind()
+```
+
+
+```{r}
+df_ext_all <- list(df_ext_dem_1, df_ext_dem_2,
+               df_ext_prf_1, df_ext_prf_2)
+
+  
+df_ext_chr <- c("df_ext_dem_1", "df_ext_dem_2",
+            "df_ext_prf_1", "df_ext_prf_2")
+```
+
+
+```{r}
+for (i in 1:length(df_ext_chr)){
+  saveRDS(df_ext_all[[i]], paste0("../df/rbind/", df_ext_chr[i], ".RDS"))
+}
+```
+
+# inj dem
+
+```{r}
+inj_dem <- list.files("../rds/inj/dem")
+
+inj_dem
+```
+
+```{r}
+# get folder names
+
+inj_dem_1 <- inj_dem %>% str_subset("dem_1")
+
+inj_dem_2 <- inj_dem %>% str_subset("dem_2")
+```
+
+```{r}
+# combine dem_1
+
+df_inj_dem_1 <- map(paste0("../rds/inj/dem/", inj_dem_1), readRDS) %>% list_rbind()
+```
+
+```{r}
+# combine dem_2
+
+df_inj_dem_2 <- map(paste0("../rds/inj/dem/", inj_dem_2), readRDS) %>% list_rbind()
+```
+
+# prf
+
+```{r}
+inj_prf <- list.files("../rds/inj/prf")
+
+inj_prf
+```
+
+```{r}
+# get folder names
+
+inj_prf_1 <- inj_prf %>% str_subset("prf_1")
+
+inj_prf_2 <- inj_prf %>% str_subset("prf_2")
+```
+
+```{r}
+# combine dem_1
+
+df_inj_prf_1 <- map(paste0("../rds/inj/prf/", inj_prf_1), readRDS) %>% list_rbind()
+```
+
+```{r}
+# combine dem_2
+
+df_inj_prf_2 <- map(paste0("../rds/inj/prf/", inj_prf_2), readRDS) %>% list_rbind()
+```
+
+
+```{r}
+df_inj_all <- list(df_inj_dem_1, df_inj_dem_2,
+               df_inj_prf_1, df_inj_prf_2)
+
+  
+df_inj_chr <- c("df_inj_dem_1", "df_inj_dem_2",
+            "df_inj_prf_1", "df_inj_prf_2")
+```
+
+
+```{r}
+for (i in 1:length(df_inj_chr)){
+  saveRDS(df_inj_all[[i]], paste0("../df/rbind/", df_inj_chr[i], ".RDS"))
+}
+```
+
+
+```{r}
+
+```
+

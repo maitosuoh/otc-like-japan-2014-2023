@@ -1,0 +1,101 @@
+---
+title: "NDB"
+output: html_document
+date: "2026-05-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(openxlsx)
+```
+
+
+```{r}
+# make df folder
+
+dir.create("../df", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+
+dir.create("../df/rbind", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+```
+
+```{r}
+list.files("../rds/oral") 
+```
+
+```{r}
+oral_dem <- list.files("../rds/oral/dem")
+
+oral_dem
+```
+
+```{r}
+# get folder names
+
+oral_dem_1 <- oral_dem %>% str_subset("dem_1")
+
+oral_dem_2 <- oral_dem %>% str_subset("dem_2")
+```
+
+```{r}
+# combine dem_1
+
+df_oral_dem_1 <- map(paste0("../rds/oral/dem/", oral_dem_1), readRDS) %>% list_rbind()
+```
+
+```{r}
+# combine dem_2
+
+df_oral_dem_2 <- map(paste0("../rds/oral/dem/", oral_dem_2), readRDS) %>% list_rbind()
+```
+
+# prf
+
+```{r}
+oral_prf <- list.files("../rds/oral/prf")
+
+oral_prf
+```
+
+```{r}
+# get folder names
+
+oral_prf_1 <- oral_prf %>% str_subset("prf_1")
+
+oral_prf_2 <- oral_prf %>% str_subset("prf_2")
+```
+
+```{r}
+# combine prf_1
+
+df_oral_prf_1 <- map(paste0("../rds/oral/prf/", oral_prf_1), readRDS) %>% list_rbind()
+```
+
+```{r}
+# combine dem_2
+
+df_oral_prf_2 <- map(paste0("../rds/oral/prf/", oral_prf_2), readRDS) %>% list_rbind()
+```
+
+
+```{r}
+df_all <- list(df_oral_dem_1, df_oral_dem_2,
+               df_oral_prf_1, df_oral_prf_2)
+
+  
+df_chr <- c("df_oral_dem_1", "df_oral_dem_2",
+            "df_oral_prf_1", "df_oral_prf_2")
+```
+
+
+```{r}
+for (i in 1:length(df_chr)){
+  saveRDS(df_all[[i]], paste0("../df/rbind/", df_chr[i], ".RDS"))
+}
+```
+
+# end of rbind

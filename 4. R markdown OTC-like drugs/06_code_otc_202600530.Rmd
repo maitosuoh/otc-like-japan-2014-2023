@@ -1,0 +1,343 @@
+---
+title: "OTC-like drugs"
+output: html_document
+date: "2026-05-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(openxlsx)
+
+library(stringi)
+library(ggh4x)
+
+library(cowplot)
+library(patchwork)
+library(ggtext)
+library(ggrepel)
+
+library(ggh4x)
+library(rkt)
+```
+
+```{r}
+options(knitr.df_print = rmarkdown::paged_table)
+```
+
+
+```{r}
+# make df folder
+
+dir.create("../df/format", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+```
+
+```{r}
+# make df folder
+
+dir.create("../df/format/dem", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+
+dir.create("../df/format/prf", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+```
+
+
+```{r}
+file_f <- list.files("../df/filter/dem", pattern = "dem")  %>% str_remove("\\.RDS")
+
+file_f
+
+path_f <- paste0("../df/filter/dem/", file_f, ".RDS" )
+```
+
+```{r}
+age_start <- seq(0, 90, 5)
+
+age_end <- c(seq(4, 89, 5), "")
+
+levels_age <- paste0(age_start, "–", age_end)
+
+levels_age
+```
+
+```{r}
+list_df <- purrr::map(path_f, function(x){
+  
+  df <- readRDS(x) %>%
+    pivot_longer(cols = c(starts_with("M_"), starts_with("F_")),
+              names_to = "SEX_AGE",
+              values_to = "VALUE")
+
+  df <- df  %>%
+    mutate(SEX = str_extract(SEX_AGE, "^M|^F")) %>%
+    mutate(AGE = str_remove(SEX_AGE, "^M_|^F_"))
+  
+  df <- df  %>%
+    mutate(SEX = case_when(SEX == "M" ~ "Male",
+                         SEX == "F" ~ "Female")) %>%
+    mutate(SEX = factor(SEX, levels = c("Male", "Female")))
+  
+#  levels_age <- df %>% distinct(AGE) %>%
+#    mutate(AGE = str_replace_all(AGE, "_", "–")) %>%
+#    pull(AGE)
+  
+  df <- df  %>%
+      mutate(AGE = str_replace(AGE, "_", "–")) %>%
+    mutate(AGE = fct_other(AGE,
+                         keep = as.character(levels_age[1:18]),
+                         other_level = "90–")) %>%
+    mutate(AGE = factor(AGE, levels = levels_age[1:19]))
+  
+  
+  df <- df %>%
+    mutate(across(c(TOTAL, VALUE), ~ str_replace(.x, "-", "0"))) %>%
+    mutate(across(c(TOTAL, VALUE), ~ as.numeric(.x))) %>%
+    mutate(across(c(TOTAL, VALUE), ~ replace_na(.x, 0)))
+  
+  return(df)
+  
+})
+```
+
+
+```{r}
+for (i in 1:length(file_f)){
+  assign(file_f[i], list_df[[i]])
+}
+```
+
+# check the number of drugs
+
+```{r}
+df_drug_dem <- df_oral_dem %>%
+  bind_rows(df_ext_dem)
+```
+
+```{r}
+df_drug_dem %>%
+  distinct(ING, YEAR, SHEET) %>%
+  count(ING, SHEET) %>%
+  arrange(desc(n))
+```
+
+
+```{r}
+# all drugs based on ING
+
+df_drug_dem %>%
+  distinct(ING, YEAR, SHEET) %>%
+  count(ING, SHEET) %>%
+  arrange(desc(n))
+```
+
+
+
+
+```{r}
+# all drugs based on ING
+
+df_drug_dem %>%
+  distinct(ING, YEAR, SHEET) %>%
+  count(ING, SHEET) %>%
+  arrange(desc(n)) %>%
+  filter(n == 10) %>%
+  ungroup() %>%
+  distinct(ING)
+```
+
+```{r}
+class_otc <- df_drug_dem %>%
+  distinct(CLASS_name) %>%
+  arrange(CLASS_name) %>%
+  pull(CLASS_name)
+
+class_otc
+```
+
+```{r}
+df_drug_dem %>%
+  distinct(DRUG_name, .keep_all = TRUE) %>%
+  filter(GEN == 0 | is.na(GENERIC) | ORIGINAL == "先発品") %>%
+  View()
+```
+
+
+```{r}
+ing_otc <- df_drug_dem %>%
+  distinct(ING) %>%
+  arrange(ING) %>%
+  pull(ING)
+
+ing_otc
+```
+
+```{r}
+# Gemini used to assist in constructing this function
+
+convert_otc <- function(x) {
+
+  mapping <- c(
+    "アシクロビル" = "Acyclovir",
+    "アシタザノラスト水和物" = "Acitazanolast hydrate",
+    "アスコルビン酸" = "Ascorbic acid",
+    "アンモニア水" = "Ammonia water",
+    "イソコナゾール硝酸塩" = "Isoconazole nitrate",
+    "イソプロパノール" = "Isopropanol",
+    "イトプリド塩酸塩" = "Itopride hydrochloride",
+    "イブプロフェン" = "Ibuprofen",
+    "イブプロフェンピコノール" = "Ibuprofen piconol",
+    "インドメタシン" = "Indomethacin",
+    "エタノール" = "Ethanol",
+    "エピナスチン塩酸塩" = "Epinastine hydrochloride",
+    "オキシコナゾール硝酸塩" = "Oxiconazole nitrate",
+    "オキシテトラサイクリン塩酸塩・ヒドロコルチゾン" = "Oxytetracycline hydrochloride/Hydrocortisone",
+    "オキシドール" = "Oxydol (Hydrogen peroxide solution)",
+    "オリブ油" = "Olive oil",
+    "カルボシステイン" = "Carbocisteine",
+    "クロトリマゾール" = "Clotrimazole",
+    "クロラムフェニコール" = "Chloramphenicol",
+    "クロルヘキシジングルコン酸塩" = "Chlorhexidine gluconate",
+    "ケトチフェンフマル酸塩" = "Ketotifen fumarate",
+    "サリチル酸" = "Salicylic acid",
+    "ジクロフェナクナトリウム" = "Diclofenac sodium",
+    "チンク油" = "Zinc oxide oil",
+    "テルビナフィン塩酸塩" = "Terbinafine hydrochloride",
+    "デキサメタゾン" = "Dexamethasone",
+    "トコフェロール酢酸エステル" = "Tocopherol acetate",
+    "トリアムシノロンアセトニド" = "Triamcinolone acetonide",
+    "ハチミツ" = "Honey",
+    "ヒドロコルチゾン酪酸エステル" = "Hydrocortisone butyrate",
+    "ビサコジル" = "Bisacodyl",
+    "ビダラビン" = "Vidarabine",
+    "ピコスルファートナトリウム水和物" = "Sodium picosulfate hydrate",
+    "フェキソフェナジン塩酸塩" = "Fexofenadine hydrochloride",
+    "フェキソフェナジン塩酸塩・塩酸プソイドエフェドリン" = "Fexofenadine hydrochloride/Pseudoephedrine hydrochloride",
+    "フェルビナク" = "Felbinac",
+    "フラボキサート塩酸塩" = "Flavoxate hydrochloride",
+    "フルチカゾンプロピオン酸エステル" = "Fluticasone propionate",
+    "ブテナフィン塩酸塩" = "Butenafine hydrochloride",
+    "ブドウ酒" = "Wine",
+    "プレドニゾロン吉草酸エステル酢酸エステル" = "Prednisolone valerate acetate",
+    "ヘパリン類似物質" = "Heparinoid",
+    "ベタメタゾン吉草酸エステル" = "Betamethasone valerate",
+    "ベタメタゾン吉草酸エステル・フラジオマイシン硫酸塩" = "Betamethasone valerate/Fradiomycin sulfate",
+    "ベポタスチンベシル酸塩" = "Bepotastine besilate",
+    "ベルベリン塩化物水和物・ゲンノショウコエキス" = "Berberine chloride hydrate/Geranium thunbergii extract",
+    "ベンザルコニウム塩化物" = "Benzalkonium chloride",
+    "ペミロラストカリウム" = "Pemirolast potassium",
+    "ホウ砂" = "Borax",
+    "ホウ酸" = "Boric acid",
+    "ポビドンヨード" = "Povidone-iodine",
+    "ポリエンホスファチジルコリン" = "Polyenephosphatidylcholine",
+    "マルツエキス" = "Malt extract",
+    "ミコナゾール硝酸塩" = "Miconazole nitrate",
+    "モメタゾンフランカルボン酸エステル水和物" = "Mometasone furoate hydrate",
+    "ヨウ素" = "Iodine",
+    "ロキソプロフェンナトリウム水和物" = "Loxoprofen sodium hydrate",
+    "ロラタジン" = "Loratadine",
+    "塩酸テトラヒドロゾリン・プレドニゾロン" = "Tetrahydrozoline hydrochloride/Prednisolone",
+    "尿素" = "Urea",
+    "希ヨードチンキ" = "Dilute iodine tincture",
+    "次亜塩素酸ナトリウム" = "Sodium hypochlorite",
+    "沈降炭酸カルシウム・コレカルシフェロール・炭酸マグネシウム" = "Precipitated calcium carbonate/Cholecalciferol/Magnesium carbonate",
+    "消毒用エタノール" = "Ethanol disinfectant",
+    "炭酸水素ナトリウム" = "Sodium bicarbonate",
+    "無水エタノール" = "Anhydrous ethanol",
+    "白色ワセリン" = "White petrolatum",
+    "精製水" = "Purified water",
+    "複方ヨード・グリセリン" = "Compound iodine glycerin",
+    "酸化マグネシウム" = "Magnesium oxide",
+    "酸化亜鉛" = "Zinc oxide",
+    "静脈血管叢エキス" = "Venous plexus extract",
+    "Ｌ－カルボシステイン" = "Carbocisteine"
+  )
+  
+
+  res <- mapping[x]
+  if (is.na(res)) return(x) else return(unname(res))
+}
+
+convert_otc <- Vectorize(convert_otc)
+```
+
+
+```{r}
+df_drug_dem %>%
+   distinct(TYPE, CLASS_name, CLASS_code, DRUG_code, DRUG_name, ING, ) %>%
+  mutate(ING_en = convert_otc(ING))
+```
+
+
+```{r}
+df_drug_dem %>%
+   distinct(TYPE, CLASS_name, CLASS_code, DRUG_code, DRUG_name, ING, ) %>%
+  mutate(ING_en = convert_otc(ING)) %>%
+  filter(ING == "デキサメタゾン")
+```
+
+```{r}
+df_drug_dem %>%
+   distinct(TYPE, CLASS_name, CLASS_code, DRUG_code, DRUG_name, ING, ) %>%
+  mutate(ING_en = convert_otc(ING)) %>%
+  filter(CLASS_name == "眼科用剤")
+```
+
+```{r}
+df_otc_ing <- df_drug_dem %>%
+  mutate(ING_en = convert_otc(ING)) %>%
+  distinct(TYPE, CLASS_code, DRUG_code, DRUG_name, ING, ING_en)
+```
+
+```{r}
+df_otc_ing %>%
+  group_by(DRUG_code) %>%
+  filter(n()>1) %>%
+  View()
+```
+
+```{r}
+otc_col <- c("Class code",
+             "Drug code",
+             "Drug name (JP)",
+             "Ingredient (JP)",
+             "Ingredient (EN)")
+```
+
+
+```{r}
+df_otc_oral <- df_otc_ing %>%
+  filter(TYPE == "oral") %>%
+  select(!c(TYPE)) %>%
+  arrange(CLASS_code, ING_en, DRUG_code)
+
+df_otc_oral
+```
+
+```{r}
+df_otc_ext <- df_otc_ing %>%
+  filter(TYPE == "ext") %>%
+  select(!c(TYPE)) %>%
+  arrange(CLASS_code, ING_en, DRUG_code)
+
+df_otc_ext
+```
+
+```{r}
+colnames(df_otc_oral) <- otc_col
+
+colnames(df_otc_ext) <- otc_col
+```
+
+
+```{r}
+list_df_otc <- list("Oral" = df_otc_oral,
+                "External" = df_otc_ext)
+
+openxlsx::write.xlsx(list_df_otc, file = "../table/TableS1.xlsx") 
+```
+

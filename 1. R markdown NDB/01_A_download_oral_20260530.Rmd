@@ -1,0 +1,304 @@
+---
+title: "NDB"
+output: html_document
+date: "2026-05-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+# create directories
+
+dir.create("../xlsx", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+dir.create("../xlsx/oral", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+
+dir.create("../xlsx/oral/inpt_dem", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+dir.create("../xlsx/oral/inpt_prf", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+
+dir.create("../xlsx/oral/outpt_inpr_dem", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+dir.create("../xlsx/oral/outpt_inpr_prf", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+
+dir.create("../xlsx/oral/outpt_outpr_dem", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+dir.create("../xlsx/oral/outpt_outpr_prf", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+```
+
+
+
+```{r}
+# xlsx files for oral drug, outpatient 
+#　内服　外来 院外　制年齢
+
+# "https://www.mhlw.go.jp/content/12400000/001495390.xlsx"
+#
+# "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000139843.xlsx",
+#
+# "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000177287.xlsx",
+#
+# "https://www.mhlw.go.jp/content/12400000/000347790.xlsx",
+#
+# "https://www.mhlw.go.jp/content/12400000/000730485.xlsx",
+#
+# "https://www.mhlw.go.jp/content/12400000/000711129.xlsx",
+#
+# "https://www.mhlw.go.jp/content/12400000/000821759.xlsx",
+#
+# "https://www.mhlw.go.jp/content/12400000/001262339.xlsx",
+#
+# "https://www.mhlw.go.jp/content/12400000/001122626.xlsx",
+#
+# "https://www.mhlw.go.jp/content/12400000/001258655.xlsx"
+
+
+url_outpt_outpr_dem <- c("https://www.mhlw.go.jp/content/12400000/001495390.xlsx",
+                         "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000139843.xlsx",
+              "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000177287.xlsx",
+              "https://www.mhlw.go.jp/content/12400000/000347790.xlsx",
+              "https://www.mhlw.go.jp/content/12400000/000730485.xlsx",
+              "https://www.mhlw.go.jp/content/12400000/000711129.xlsx",
+              "https://www.mhlw.go.jp/content/12400000/000821759.xlsx",
+              "https://www.mhlw.go.jp/content/12400000/001262339.xlsx",
+              "https://www.mhlw.go.jp/content/12400000/001122626.xlsx",
+              "https://www.mhlw.go.jp/content/12400000/001258655.xlsx")
+
+```
+
+```{r}
+file_outpt_outpr_dem <- url_outpt_outpr_dem %>% str_extract("00[:digit:]+\\.xlsx")
+
+path_outpt_outpr_dem <- paste0("../xlsx/oral/outpt_outpr_dem/", file_outpt_outpr_dem)
+```
+
+```{r}
+for (i in 1:length(url_outpt_outpr_dem)){
+  download.file(url_outpt_outpr_dem[i], path_outpt_outpr_dem[i], mode = "wb")
+  print(paste(file_outpt_outpr_dem[i], "downloaded"))
+}
+```
+
+
+# outpatient out prescription prefecture
+```{r}
+# xlsx files for oral drug, outpatient 
+#　外来　院外　都道府県
+
+# "https://www.mhlw.go.jp/content/12400000/001495391.xlsx"
+# "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000139844.xlsx",
+# "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000177288.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/000347791.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/000730486.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/000560109.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/000821761.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/001262340.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/001122627.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/001258659.xlsx"
+
+
+url_outpt_outpr_prf <- c("https://www.mhlw.go.jp/content/12400000/001495391.xlsx",
+                         "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000139844.xlsx",
+                         "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000177288.xlsx",
+                         "https://www.mhlw.go.jp/content/12400000/000347791.xlsx",
+                         "https://www.mhlw.go.jp/content/12400000/000730486.xlsx",
+                         "https://www.mhlw.go.jp/content/12400000/000560109.xlsx",
+                         "https://www.mhlw.go.jp/content/12400000/000821761.xlsx",
+                         "https://www.mhlw.go.jp/content/12400000/001262340.xlsx",
+                         "https://www.mhlw.go.jp/content/12400000/001122627.xlsx",
+                         "https://www.mhlw.go.jp/content/12400000/001258659.xlsx")
+```
+
+```{r}
+file_outpt_outpr_prf <- url_outpt_outpr_prf %>% str_extract("00[:digit:]+\\.xlsx$")
+
+path_outpt_outpr_prf <- paste0("../xlsx/oral/outpt_outpr_prf/", file_outpt_outpr_prf)
+```
+
+```{r}
+for (i in 1:length(url_outpt_outpr_prf)){
+  download.file(url_outpt_outpr_prf[i], path_outpt_outpr_prf[i], mode = "wb")
+  print(paste(file_outpt_outpr_prf[i], "downloaded"))
+}
+```
+
+
+# outpatient in-prescriptoion demographic
+```{r}
+# xlsx files for oral drug, outpatient 
+#　外来　院外　性年齢
+
+# "https://www.mhlw.go.jp/content/12400000/001495396.xlsx"
+# "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000139841.xlsx"
+# "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000177289.xlsx"
+# "https://www.mhlw.go.jp/content/12400000/000347792.xlsx"
+# "https://www.mhlw.go.jp/content/12400000/000730488.xlsx"
+# "https://www.mhlw.go.jp/content/12400000/000560110.xlsx"
+# "https://www.mhlw.go.jp/content/12400000/000821764.xlsx"
+# "https://www.mhlw.go.jp/content/12400000/001262341.xlsx"
+# "https://www.mhlw.go.jp/content/12400000/001122628.xlsx"
+# "https://www.mhlw.go.jp/content/12400000/001258660.xlsx"
+
+
+url_outpt_inpr_dem <- c("https://www.mhlw.go.jp/content/12400000/001495396.xlsx",
+                        "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000139841.xlsx",
+                        "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000177289.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/000347792.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/000730488.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/000560110.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/000821764.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/001262341.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/001122628.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/001258660.xlsx")
+```
+
+```{r}
+file_outpt_inpr_dem <- url_outpt_inpr_dem %>% str_extract("00[:digit:]+\\.xlsx$")
+```
+
+
+```{r}
+file_outpt_inpr_dem <- url_outpt_inpr_dem %>% str_extract("00[:digit:]+\\.xlsx$")
+
+path_outpt_inpr_dem <- paste0("../xlsx/oral/outpt_inpr_dem/", file_outpt_inpr_dem)
+```
+
+```{r}
+for (i in 1:length(url_outpt_inpr_dem)){
+  download.file(url_outpt_inpr_dem[i], path_outpt_inpr_dem[i], mode = "wb")
+  print(paste(file_outpt_inpr_dem[i], "downloaded"))
+}
+```
+
+
+# outpatient inprescriptoion prefecture
+```{r}
+# xlsx files for oral drug, outpatient 
+#　外来　院外　都道府県
+
+# "https://www.mhlw.go.jp/content/12400000/001495397.xlsx"
+# "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000139842.xlsx",
+# "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000177290.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/000347793.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/000730489.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/000560111.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/000821765.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/001262342.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/001122629.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/001258661.xlsx")
+
+
+url_outpt_inpr_prf <- c( "https://www.mhlw.go.jp/content/12400000/001495397.xlsx",
+                        "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000139842.xlsx",
+                        "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000177290.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/000347793.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/000730489.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/000560111.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/000821765.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/001262342.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/001122629.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/001258661.xlsx")
+```
+
+```{r}
+file_outpt_inpr_prf <- url_outpt_inpr_prf %>% str_extract("00[:digit:]+\\.xlsx$")
+
+path_outpt_inpr_prf <- paste0("../xlsx/oral/outpt_inpr_prf/", file_outpt_inpr_prf)
+```
+
+```{r}
+for (i in 1:length(url_outpt_inpr_prf)){
+  download.file(url_outpt_inpr_prf[i], path_outpt_inpr_prf[i], mode = "wb")
+  print(paste(file_outpt_inpr_prf[i], "downloaded"))
+}
+```
+
+# in demographic
+
+```{r}
+# "https://www.mhlw.go.jp/content/12400000/001495419.xlsx"
+# "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000139845.xlsx"
+# "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000177291.xlsx"
+# "https://www.mhlw.go.jp/content/12400000/000347794.xlsx"
+# "https://www.mhlw.go.jp/content/12400000/000730490.xlsx"
+# "https://www.mhlw.go.jp/content/12400000/000560112.xlsx"
+# "https://www.mhlw.go.jp/content/12400000/000821766.xlsx"
+# "https://www.mhlw.go.jp/content/12400000/001262343.xlsx"
+# "https://www.mhlw.go.jp/content/12400000/001122630.xlsx"
+# "https://www.mhlw.go.jp/content/12400000/001258662.xlsx"
+
+
+url_inpt_dem <- c("https://www.mhlw.go.jp/content/12400000/001495419.xlsx",
+                  "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000139845.xlsx",
+                        "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000177291.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/000347794.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/000730490.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/000560112.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/000821766.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/001262343.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/001122630.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/001258662.xlsx")
+```
+
+
+
+```{r}
+file_inpt_dem <- url_inpt_dem %>% str_extract("00[:digit:]+\\.xlsx$")
+
+path_inpt_dem <- paste0("../xlsx/oral/inpt_dem/", file_inpt_dem)
+```
+
+```{r}
+for (i in 1:length(url_inpt_dem)){
+  download.file(url_inpt_dem[i], path_inpt_dem[i], mode = "wb")
+  print(paste(file_inpt_dem[i], "downloaded"))
+}
+```
+
+
+# in pref
+
+```{r}
+# "https://www.mhlw.go.jp/content/12400000/001495423.xlsx"
+# "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000139846.xlsx",
+# "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000177292.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/000347795.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/000730491.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/000560113.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/000821767.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/001262344.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/001122631.xlsx",
+# "https://www.mhlw.go.jp/content/12400000/001258663.xlsx")
+
+
+
+url_inpt_prf <- c("https://www.mhlw.go.jp/content/12400000/001495423.xlsx",
+                  "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000139846.xlsx",
+                        "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000177292.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/000347795.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/000730491.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/000560113.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/000821767.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/001262344.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/001122631.xlsx",
+                        "https://www.mhlw.go.jp/content/12400000/001258663.xlsx")
+```
+
+```{r}
+file_inpt_prf <- url_inpt_prf %>% str_extract("00[:digit:]+\\.xlsx$")
+
+path_inpt_prf <- paste0("../xlsx/oral/inpt_prf/", file_inpt_prf)
+```
+
+```{r}
+for (i in 1:length(url_inpt_prf)){
+  download.file(url_inpt_prf[i], path_inpt_prf[i], mode = "wb")
+  print(paste(file_inpt_prf[i], "downloaded"))
+}
+```
+
+# check the downloaded files
+
+

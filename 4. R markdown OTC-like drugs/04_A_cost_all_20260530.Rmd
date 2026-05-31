@@ -1,0 +1,1323 @@
+---
+title: "OTC-like drugs"
+output: html_document
+date: "2026-05-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(openxlsx)
+
+library(stringi)
+library(ggh4x)
+
+library(cowplot)
+library(patchwork)
+library(ggtext)
+library(ggrepel)
+
+library(ggh4x)
+library(rkt)
+```
+
+```{r}
+options(knitr.df_print = rmarkdown::paged_table)
+```
+
+
+```{r}
+# make df folder
+
+dir.create("../df/format", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+```
+
+```{r}
+# make df folder
+
+dir.create("../df/format/dem", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+
+dir.create("../df/format/prf", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+```
+
+```{r}
+# make df folder
+
+dir.create("../plot", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+```
+
+```{r}
+file_dem <- list.files("../df/filter/dem") %>% str_remove("\\.RDS")
+
+file_dem
+
+path_dem <- paste0("../df/filter/dem/", file_dem , ".RDS")
+```
+
+```{r}
+file_prf <- list.files("../df/filter/prf") %>% str_remove("\\.RDS")
+
+file_prf
+
+path_prf <- paste0("../df/filter/prf/", file_prf , ".RDS")
+```
+
+```{r}
+file_all <- c(file_dem, file_prf)
+
+path_all <- c(path_dem, path_prf)
+```
+
+```{r}
+df_1 <- readRDS(path_all[1])
+```
+
+
+```{r}
+list_df <- purrr::map(path_dem, function(x){
+  
+  df <- readRDS(x) %>%
+    pivot_longer(cols = c(starts_with("M_"), starts_with("F_")),
+              names_to = "SEX_AGE",
+              values_to = "VALUE")
+
+  df <- df  %>%
+    mutate(SEX = str_extract(SEX_AGE, "^M|^F")) %>%
+    mutate(AGE = str_remove(SEX_AGE, "^M_|^F_"))
+  
+  df <- df  %>%
+    mutate(SEX = case_when(SEX == "M" ~ "Male",
+                         SEX == "F" ~ "Female")) %>%
+    mutate(SEX = factor(SEX, levels = c("Male", "Female")))
+  
+  levels_age <- df %>% distinct(AGE) %>%
+    mutate(AGE = str_replace_all(AGE, "_", "–")) %>%
+    pull(AGE)
+  
+  df <- df  %>%
+      mutate(AGE = str_replace(AGE, "_", "–")) %>%
+    mutate(AGE = fct_other(AGE,
+                         keep = as.character(levels_age[1:18]),
+                         other_level = "90–"))
+  
+  
+#   df <- df %>% 
+#  mutate(AGE = str_replace(AGE, "_", "–")) %>%
+#  mutate(AGE = factor(AGE, levels = levels_age))
+  
+  df <- df %>%
+    mutate(across(c(TOTAL, VALUE), ~ str_replace(.x, "-", "0"))) %>%
+    mutate(across(c(TOTAL, VALUE), ~ as.numeric(.x))) %>%
+    mutate(across(c(TOTAL, VALUE), ~ replace_na(.x, 0)))
+  
+  return(df)
+  
+})
+```
+
+
+```{r}
+for (i in 1:length(file_dem)){
+  assign(file_dem[i], list_df[[i]])
+}
+```
+
+```{r}
+df_otc_dem <- df_oral_dem %>%
+  bind_rows(df_ext_dem)
+```
+
+```{r}
+pal_tab10 <- c("#1f77b4",
+               "#ff7f0e",
+               "#2ca02c",
+               "#d62728",
+               "#9467bd",
+               "#17becf",
+               "#e377c2",
+               "#bcbd22",
+               "#8c564b" )
+  
+  # tab:gray : #7f7f7f
+```
+
+
+
+
+```{r}
+df_otc_dem %>%
+  distinct(AGE) %>% pull(AGE)
+```
+
+
+```{r}
+age_start <- seq(0, 90, 5)
+
+age_end <- c(seq(4, 89, 5), "")
+
+levels_age <- paste0(age_start, "–", age_end)
+
+levels_age
+```
+
+
+```{r}
+ df_otc_dem <- df_otc_dem %>%
+  mutate(AGE = factor(AGE, levels_age))
+```
+
+```{r}
+# Ｌ－カルボシステイン
+
+df_otc_dem <- df_otc_dem %>%
+  mutate(ING = str_remove(ING, "Ｌ－"))
+```
+
+```{r}
+ df_otc_dem %>%
+  distinct(SHEET)
+```
+
+
+```{r}
+# add inpatient outpatient
+
+df_otc_dem <- df_otc_dem %>%
+  mutate(IO = case_when(SHEET == "inpt" ~ "In",
+                        str_detect(SHEET, "outpt") ~ "Out",
+                       .default = NA)) %>%
+  mutate(IO = factor(IO, levels = c("Out", "In")))
+
+```
+
+
+```{r}
+df_otc_io <-  df_otc_dem %>%
+  distinct(DRUG_name, YEAR, SHEET, .keep_all = TRUE) %>%
+  group_by(YEAR, TYPE, IO) %>%
+  summarise(SUM = sum(TOTAL * COST_per)/10^9) %>%
+  
+  bind_rows(df_otc_dem %>%
+              distinct(DRUG_name, YEAR, SHEET, .keep_all = TRUE) %>%
+              group_by(YEAR, TYPE) %>%
+              summarise(SUM = sum(TOTAL * COST_per)/10^9) %>%
+              mutate(IO = "Total")) %>%
+  
+  bind_rows(df_otc_dem %>%
+              distinct(DRUG_name, YEAR, SHEET, .keep_all = TRUE) %>%
+              group_by(YEAR, IO) %>%
+              summarise(SUM = sum(TOTAL * COST_per)/10^9) %>%
+              mutate(TYPE = "All")) %>%
+  
+  bind_rows(df_otc_dem %>%
+              distinct(DRUG_name, YEAR, SHEET, .keep_all = TRUE) %>%
+              group_by(YEAR) %>%
+              summarise(SUM = sum(TOTAL * COST_per)/10^9) %>%
+              mutate(TYPE = "All",
+                     IO = "Total")) %>%
+  
+  mutate(IO = factor(IO, levels = c("Total", "Out", "In"))) %>%
+  
+  mutate(TYPE = case_when(TYPE == "oral" ~ "Oral",
+                          TYPE == "ext" ~ "External",
+                          .default = TYPE)) %>%
+  mutate(TYPE = factor(TYPE, levels = c("All", "Oral", "External"))) 
+```
+```{r}
+df_otc_io
+```
+
+
+```{r}
+df_otc_io %>%
+  filter(IO != "Total") %>%
+  group_by(YEAR, TYPE) %>%
+  mutate(PCT = SUM/sum(SUM) * 100) %>%
+  group_by(TYPE, IO) %>%
+  summarise(MAX = max(PCT),
+            MIN = min(PCT))
+```
+
+# run RKT
+
+```{r}
+get_exp <- function(x){
+
+  if (x > 0.001){
+    
+    return("")
+  }
+  
+  else {
+  
+    p <- formatC(x, digits = 1, format = "e", flag = "#")
+    
+    ex <- p %>% str_extract("(?<=e).+") %>%
+      str_remove_all("(?<=\\-)0+") %>%
+      str_replace("-", "−")
+    
+    return(ex)
+  }
+}
+
+get_expv <- Vectorize(get_exp)
+```
+
+```{r}
+get_num <- function(x){
+
+    if (x > 0.001){
+    
+      p <- formatC(x, digits = 2, format = "fg", flag = "#")
+      
+      return(p)
+  }
+  
+  else {
+  
+    p <- formatC(x, digits = 1, format = "e", flag = "#")
+    
+    num <- p %>% str_extract(".+(?=e)")
+    
+    num <- str_c(num, "×10")
+      
+    return(num)
+  }
+}
+
+get_numv <- Vectorize(get_num)
+```
+
+```{r}
+rkt_otc_io <- df_otc_io %>%
+  nest(data = - c(TYPE, IO)) %>%
+ mutate(
+    model = purrr::map(data, ~ rkt(date = .x$YEAR,
+                                 y = .x$SUM)),
+    tau = map_dbl(model, "tau"),
+    p_value = map_dbl(model, "sl"),
+    slope = map_dbl(model, "B")
+  )
+
+rkt_otc_io
+```
+
+```{r}
+label_otc_io <- rkt_otc_io %>%
+  mutate(tau = formatC(tau, digits = 2, format = "fg", flag = "#")) %>%
+  mutate(tau = str_replace(tau, "-", "−")) %>%
+  
+  mutate(p_exp = get_expv(p_value)) %>%
+  mutate(p_num = get_numv(p_value)) %>%
+
+  mutate(slope = round(slope)) %>%
+  mutate(slope = scales::comma(slope)) %>%
+  mutate(slope = str_replace(slope, "-", "−")) %>%
+  
+  mutate(label_slope = paste0("beta == '", slope, "'" )) %>%
+  mutate(label_tau = paste0("tau == '", tau, "'")) %>%
+  mutate(label_p = paste0("italic(p) == '", p_num, "'^'", p_exp, "'")) 
+  
+
+label_otc_io 
+```
+
+```{r}
+label_otc_io <- label_otc_io %>%
+  mutate(y_tau = case_when(TYPE == "All" ~ 0.5,
+                             .default = 0.9)) %>%
+  mutate(y_p = case_when(TYPE == "All" ~ 0.2,
+                         .default = 0.6)) %>%
+  mutate(x = case_when(TYPE == "Oral" ~ (2014 + 2023)/2,
+                       .default = 2015)) %>%
+  
+  mutate(
+         hjust = 0,
+         vjust = 0.5)
+
+label_otc_io 
+```
+
+
+```{r}
+df_y_scale_1 <- df_otc_io %>%
+  group_by(TYPE) %>%
+  summarise(MAX = max(SUM))
+
+df_y_scale_1
+```
+```{r}
+df_y_scale_1 <- df_y_scale_1 %>%
+  mutate(YMAX = case_when(MAX > 300 ~ 400,
+                          MAX > 150 ~ 400)) %>%
+  mutate(YRAN = 4) %>%
+  mutate(YBRK = YMAX/YRAN)
+```
+
+
+```{r}
+df_otc_io %>%
+  ggplot(aes(YEAR,SUM, colour = IO, group = IO ))+
+  geom_line(linewidth = 0.7)+
+  geom_point(size =1)+
+  scale_y_continuous(limits = c(0, NA))+
+  facet_wrap2(vars(TYPE),
+              axes = "all",
+              remove_labels = "all")+
+  theme_classic()
+```
+
+# plot 1
+
+```{r}
+levels_type <- c("All", "Oral", "External")
+```
+
+
+```{r}
+label_otc_io 
+```
+
+```{r}
+pal_p1 <- c("black",
+            "#2ca02c",
+            "#ff7f0e")
+```
+
+
+```{r}
+list_p1 <- purrr::map2(levels_type, pal_p1, function(type, pal){
+  
+  if (type == "All"){
+    title <- "OTC-like"
+  }
+  
+  else {
+    title <- type
+  }
+  
+  ymax <- df_y_scale_1 %>% filter(TYPE == type) %>% pull(YMAX)
+  ybrk <- df_y_scale_1 %>% filter(TYPE == type) %>% pull(YBRK)
+  
+  label_otc_io <- label_otc_io %>%
+    filter(TYPE == type & IO == "Total") %>%
+    mutate(y_tau = ymax * y_tau,
+           y_p = ymax * y_p)
+                                                         
+  df_otc_io %>%
+    filter(TYPE == type & IO == "Total") %>%
+    mutate(YEAR = as.numeric(YEAR)) %>%
+    ggplot(aes(YEAR,SUM, colour = IO, group = IO ))+
+  geom_line(linewidth = 0.3)+
+  geom_point(size = 1)+
+    scale_color_manual(values = pal)+
+    geom_text(data = label_otc_io,
+              aes(x = x, y = y_tau,
+                  hjust = hjust, vjust = vjust,
+                  label = label_tau),
+              size = 2.8, colour = "black",
+              inherit.aes = FALSE,
+              parse = TRUE)+
+    
+      geom_text(data = label_otc_io,
+              aes(x = x, y = y_p,
+                  hjust = hjust, vjust = vjust,
+                  label = label_p),
+              size = 2.8, colour = "black",
+              inherit.aes = FALSE,
+              parse = TRUE)+
+    coord_cartesian(clip = "off")+
+    
+    scale_x_continuous(limits = c(2014, 2023),
+                       breaks = seq(2014, 2023, 3))+
+    
+  scale_y_continuous(limits = c(0, 400),
+                     breaks = seq(0, 400, 100))+
+  labs(title = title,
+       x = "**Year**",
+       y = "**Cost (×10<sup>9</sup> JPY)**")+
+  theme_classic()+
+  theme(plot.title = element_text(size = 8, colour = "black", face = "bold", hjust = 0.5),
+          axis.title.x = element_markdown(size = 8, colour = "black", face = "bold"),
+        axis.title.y = element_markdown(size = 8, colour = "black", face = "bold"),
+        
+          axis.text = element_text(size = 8, colour = "black"),
+          axis.line = element_line(linewidth = 0.3, colour = "black"),
+          axis.ticks = element_line(linewidth = 0.3, colour = "black"),
+          legend.title = element_blank(),
+          legend.text = element_text(size = 8, colour = "black"),
+        legend.position = "none",
+          plot.margin = margin(1, 1, 1, 1, "mm"))
+  
+})
+```
+
+```{r}
+for (i in 1:length(list_p1)){
+  print(list_p1[[i]])
+}
+```
+
+```{r}
+# save plot for assembly
+
+saveRDS(list_p1, "../plot/list_p1.RDS")
+```
+
+
+```{r}
+p1_leg <- list_p1[[1]] %>% get_legend() %>% wrap_elements()
+```
+
+
+```{r}
+# remove x axis for 1, 3
+
+for (i in 1:length(list_p1)){
+  
+  if (i %in% c(1, 3)){
+  list_p1[[i]] <- list_p1[[i]] +
+    theme(axis.title.x = element_blank())
+  }
+  else {
+    list_p1[[i]] <- list_p1[[i]]
+  }
+}
+
+# remove y axis for 2, 3
+
+for (i in 1:length(list_p1)){
+  
+  if (i %in% 2:3){
+  list_p1[[i]] <- list_p1[[i]] +
+    theme(axis.title.y = element_blank(),
+          axis.text.y = element_blank())
+  }
+  else {
+    list_p1[[i]] <- list_p1[[i]]
+  }
+}
+
+# remove legend for 1, 2
+
+for (i in 1:length(list_p1)){
+  
+  if (i %in% 1:3){
+  list_p1[[i]] <- list_p1[[i]] +
+    theme(legend.position = "none")
+  }
+  else {
+    list_p1[[i]] <- list_p1[[i]]
+  }
+}
+
+```
+
+
+```{r}
+for (i in 1:length(list_p1)){
+  print(list_p1[[i]])
+}
+```
+
+
+# add tag and assign 
+
+
+
+
+```{r}
+ df_otc_dem %>%
+  group_by(YEAR, ING) %>%
+  summarise(SUM = sum(VALUE * COST_per)/10^9) %>%
+  ggplot(aes(YEAR,SUM ))+
+  geom_col(width = 0.7)+
+  theme_classic()
+```
+
+```{r}
+# df_otc_dem <- df_otc_dem %>%
+#  filter(SHEET != "inpt")
+```
+
+
+```{r}
+df_dem_total <- df_otc_dem %>%
+  distinct(DRUG_name, YEAR, SHEET, ING, .keep_all = TRUE) %>%
+  group_by(YEAR, TYPE, ING) %>%
+    summarise(SUM = sum(VALUE * COST_per)) %>%
+  mutate(ID = paste0(YEAR, "_", ING, "_", TYPE))
+```
+
+
+
+```{r}
+df_dem_value <- df_otc_dem %>%
+  group_by(YEAR, TYPE) %>%
+  summarise(SUM = sum(VALUE * COST_per)) %>%
+  mutate(ID = paste0(YEAR, "_", "_", TYPE))
+```
+
+
+
+
+```{r}
+ df_otc_dem %>%
+  group_by(YEAR, TYPE) %>%
+  summarise(SUM = sum(VALUE * COST_per)) %>%
+  ggplot(aes(YEAR,SUM, fill = TYPE ))+
+  geom_col(width = 0.7,
+           position = "dodge")+
+  theme_classic()
+```
+
+
+```{r}
+# make bar charts
+df_otc_dem %>%
+  distinct(YEAR, DRUG_name, SHEET, .keep_all = TRUE) %>%
+  group_by(YEAR,ING, TYPE) %>%
+  summarise(SUM = sum(TOTAL * COST_per)/10^9) %>%
+  filter(YEAR =="2023") %>%
+  ggplot(aes(SUM, TYPE, fill = ING))+
+  geom_col(position= "fill")+
+  theme(legend.position = "none")
+```
+
+
+# top oral drugs
+
+
+```{r}
+ing_top_oral <- df_otc_dem %>%
+  filter(TYPE == "oral") %>%
+  distinct(YEAR, DRUG_name, SHEET, .keep_all = TRUE) %>%
+  group_by(YEAR,ING) %>%
+  summarise(SUM = sum(TOTAL * COST_per)) %>%
+  slice_max(SUM, n = 8) %>%
+  filter(YEAR == "2023") %>%
+  arrange(desc(SUM)) %>%
+  pull(ING) %>%
+  unique()
+
+ing_top_oral
+```
+
+# facet
+
+```{r}
+ df_otc_dem %>%
+  filter(TYPE == "oral" & ING %in% ing_top_oral) %>%
+  distinct(YEAR, DRUG_name, SHEET, .keep_all = TRUE) %>%
+  group_by(YEAR,ING) %>%
+  summarise(SUM = sum(TOTAL * COST_per)/10^9) %>%
+    ggplot(aes(YEAR, SUM, group = ING))+
+    geom_line(linewidth = 0.3)+
+    geom_point(size = 1)+
+    scale_y_continuous(limits = c(0, 50))+
+  facet_wrap2(vars(ING))+
+  #  labs(title = ing)+
+    theme_classic()
+```
+
+```{r}
+ing_top_oral
+```
+
+
+```{r}
+convert_oral <- function(x){
+  if (x == "フェキソフェナジン塩酸塩"){
+    return("Fexofenadine hydrochloride")
+  }
+  
+  else if (x == "カルボシステイン"){
+    return("Carbocisteine")
+  }
+  
+  else if (x == "ベポタスチンベシル酸塩")
+    return("Bepotastine besilate")
+  
+  else if (x == "ロキソプロフェンナトリウム水和物"){
+    return("Loxoprofen sodium hydrate")
+  }
+  
+  else if (x == "酸化マグネシウム"){
+    return("Magnesium oxide")
+  }
+  
+  else if (x == "エピナスチン塩酸塩"){
+    return("Epinastine hydrochloride")
+  }
+  
+    else if (x == "ロラタジン"){
+    return("Loratadine")
+  }
+
+    else if (x == "フェキソフェナジン塩酸塩・塩酸プソイドエフェドリン"){
+    return("Fexofenadine hydrochloride/\nPseudoephedrine hydrochloride")
+  }
+  
+  else {
+    return("Others")
+  }
+}
+
+convert_oral <- Vectorize(convert_oral)
+```
+
+```{r}
+levels_oral <- convert_oral(ing_top_oral)
+
+levels_oral
+```
+
+
+```{r}
+df_otc_oral <- df_otc_dem %>%
+  filter(TYPE == "oral" & ING %in% ing_top_oral) %>%
+  distinct(YEAR, DRUG_name, SHEET, .keep_all = TRUE) %>%
+  group_by(YEAR,ING) %>%
+  summarise(SUM = sum(TOTAL * COST_per)/10^9) %>%
+  mutate(ING_en = convert_oral(ING) ) %>%
+  mutate(ING_en = factor(ING_en, levels = levels_oral))
+```
+
+
+```{r}
+rkt_otc_oral <- df_otc_oral %>%
+  nest(data = - c(ING_en)) %>%
+ mutate(
+    model = purrr::map(data, ~ rkt(date = .x$YEAR,
+                                 y = .x$SUM)),
+    tau = map_dbl(model, "tau"),
+    p_value = map_dbl(model, "sl"),
+    slope = map_dbl(model, "B")
+  )
+
+rkt_otc_oral
+```
+
+```{r}
+label_otc_oral <- rkt_otc_oral %>%
+  mutate(tau = formatC(tau, digits = 2, format = "fg", flag = "#")) %>%
+  mutate(tau = str_replace(tau, "-", "−")) %>%
+  
+  mutate(p_exp = get_expv(p_value)) %>%
+  mutate(p_num = get_numv(p_value)) %>%
+
+  mutate(slope = round(slope)) %>%
+  mutate(slope = scales::comma(slope)) %>%
+  mutate(slope = str_replace(slope, "-", "−")) %>%
+  
+  mutate(label_slope = paste0("beta == '", slope, "'" )) %>%
+  mutate(label_tau = paste0("tau == '", tau, "'")) %>%
+  mutate(label_p = paste0("italic(p) == '", p_num, "'^'", p_exp, "'")) 
+  
+
+label_otc_oral
+```
+
+```{r}
+label_otc_oral <- label_otc_oral %>%
+  mutate(y_tau = 0.9) %>%
+  mutate(y_p = 0.7) %>%
+  mutate(x = (2014+2023)/2,
+         hjust = 0,
+         vjust = 0.5)
+
+label_otc_oral
+```
+
+
+```{r}
+df_y_scale_2 <- df_otc_oral %>%
+  group_by(ING_en) %>%
+  summarise(MAX = max(SUM))
+
+df_y_scale_2
+```
+
+```{r}
+df_y_scale_2 <- df_y_scale_2 %>%
+  mutate(YMAX = 50) %>%
+  mutate(YBRK = 10) %>%
+  arrange(ING_en) %>%
+  bind_cols(tibble(COL = pal_tab10[1:length(levels_oral)]))
+```
+
+```{r}
+# extract
+
+list_p2 <- purrr::map(levels_oral, function(ing){
+  
+  ymax <- df_y_scale_2 %>% filter(ING_en == ing) %>% pull(YMAX)
+  ybrk <- df_y_scale_2 %>% filter(ING_en == ing) %>% pull(YBRK)
+  
+  col <- df_y_scale_2 %>% filter(ING_en == ing) %>% pull(COL)
+  
+  label_otc_oral <- label_otc_oral %>%
+    filter(ING_en == ing) %>%
+    mutate(y_tau = ymax * y_tau,
+           y_p = ymax * y_p)
+  
+  
+  df_otc_oral %>%
+    filter(ING_en == ing) %>%
+    ggplot(aes(YEAR, SUM, group = ING_en))+
+    geom_line(linewidth = 0.3, colour = col)+
+    geom_point(size = 1, colour = col)+
+    scale_x_continuous(limits = c(2014, 2023),
+                       breaks = seq(2014, 2022, 2))+
+    scale_y_continuous(limits = c(0, ymax),
+                       breaks = seq(0, ymax, ybrk))+
+    
+       geom_text(data = label_otc_oral,
+              aes(x = x, y = y_tau,
+                  hjust = hjust, vjust = vjust,
+                  label = label_tau),
+              size = 2.8, colour = "black",
+              inherit.aes = FALSE,
+              parse = TRUE)+
+    
+      geom_text(data = label_otc_oral,
+              aes(x = x, y = y_p,
+                  hjust = hjust, vjust = vjust,
+                  label = label_p),
+              size = 2.8, colour = "black",
+              inherit.aes = FALSE,
+              parse = TRUE)+
+    
+      labs(title = ing,
+       x = "**Year**",
+       y = "**Cost (×10<sup>9</sup> JPY)**")+
+  theme_classic()+
+  theme(plot.title = element_text(size = 8, colour = "black", face = "bold", hjust = 0.5,
+                                  vjust = 0.5),
+          axis.title.x = element_markdown(size = 8, colour = "black", face = "bold"),
+        axis.title.y = element_markdown(size = 8, colour = "black", face = "bold"),
+        
+          axis.text = element_text(size = 8, colour = "black"),
+          axis.line = element_line(linewidth = 0.3, colour = "black"),
+          axis.ticks = element_line(linewidth = 0.3, colour = "black"),
+          legend.title = element_blank(),
+          legend.text = element_text(size = 8, colour = "black"),
+          legend.key.height = unit(5, "mm"),
+        legend.position = "inside",
+        legend.justification.inside = c(1, 1),
+        legend.position.inside = c(1, 1),
+          plot.margin = margin(1, 1, 1, 1, "mm"))
+    
+})
+```
+
+```{r}
+df_otc_oral %>%
+  filter(YEAR == "2023") 
+```
+
+
+```{r}
+for (i in 1:length(list_p2 )){
+  print(list_p2[[i]])
+}
+```
+
+```{r}
+
+# 1234
+# 5678
+
+# remove axis in top row
+
+for (i in 1:length(list_p2 )){
+  if(i %in% 1:4){
+    list_p2[[i]] <- list_p2[[i]]+
+      theme(axis.title.x = element_blank(),
+            axis.text.x = element_blank())
+  }
+  else {
+    list_p2[[i]] <- list_p2[[i]]
+  }
+}
+
+# remove y axis for column 2-4
+
+for (i in 1:length(list_p2 )){
+  if(i %in% c(1, 5)) {
+      list_p2[[i]] <- list_p2[[i]]
+  }
+  else {
+      list_p2[[i]] <- list_p2[[i]]+
+        theme(axis.title.y = element_blank(),
+              axis.text.y = element_blank())
+  }
+}
+```
+
+
+```{r}
+# extra plot for MgO and fexo
+
+ df_otc_oral %>%
+    filter(ING_en %in% levels_oral[1:2]) %>%
+    ggplot(aes(YEAR, SUM, group = ING_en))+
+    geom_line(linewidth = 0.3)+
+    geom_point(size = 1)
+```
+
+
+# 
+
+# top external
+
+
+```{r}
+df_otc_dem %>%
+  filter(TYPE == "ext") %>%
+  distinct(YEAR, DRUG_name, SHEET, .keep_all = TRUE) %>%
+  group_by(YEAR,ING) %>%
+  summarise(SUM = sum(TOTAL * COST_per)) %>%
+  slice_max(SUM, n = 6) %>%
+  ungroup() %>%
+  arrange(desc(SUM)) 
+```
+
+
+```{r}
+df_otc_dem %>%
+  filter(TYPE == "ext" & YEAR == "2023") %>%
+  distinct(YEAR, DRUG_name, SHEET, .keep_all = TRUE) %>%
+  group_by(YEAR,ING) %>%
+  summarise(SUM = sum(TOTAL * COST_per)) %>%
+  slice_max(SUM, n = 8) %>%
+  ungroup() %>%
+  arrange(desc(SUM)) %>%
+  pull(ING) %>%
+  unique()
+```
+
+
+```{r}
+ing_top_ext <- df_otc_dem %>%
+    filter(TYPE == "ext") %>%
+  distinct(YEAR, DRUG_name, SHEET, .keep_all = TRUE) %>%
+  group_by(YEAR,ING) %>%
+  summarise(SUM = sum(TOTAL * COST_per)) %>%
+  filter(YEAR == "2023") %>%
+  slice_max(SUM, n = 8) %>%
+  ungroup() %>%
+  arrange(desc(SUM)) %>%
+  pull(ING) %>%
+  unique()
+
+ing_top_ext
+```
+
+
+```{r}
+#[1] "ヘパリン類似物質"                        
+#[2] "エピナスチン塩酸塩"                      
+#[3] "ロキソプロフェンナトリウム水和物"        
+#[4] "ジクロフェナクナトリウム"                
+#[5] "モメタゾンフランカルボン酸エステル水和物"
+#[6] "フェルビナク"                            
+#[7] "白色ワセリン"                            
+#[8] "ベタメタゾン吉草酸エステル" 
+
+convert_ext <- function(x){
+  if (x == "ヘパリン類似物質"){
+    return("Heparinoid")
+  }
+  
+  else if (x == "ロキソプロフェンナトリウム水和物"){
+    return("Loxoprofen sodium hydrate")
+  }
+  
+    else if (x == "エピナスチン塩酸塩"){
+    return("Epinastine hydrochloride")
+  }
+  
+  else if (x == "ジクロフェナクナトリウム"){
+    return("Diclofenac sodium")
+  }
+  
+  else if (x == "フェルビナク"){
+    return("Felbinac")
+  }
+  
+  else if (x == "モメタゾンフランカルボン酸エステル水和物"){
+    return("Mometasone furoate hydrate")
+  }
+  
+  else if (x == "フルチカゾンプロピオン酸エステル"){
+    return("Fluticasone propionate")
+  }
+  
+  else if (x == "白色ワセリン"){
+    return("White petrolatum")
+  }
+  
+    else if (x == "ベタメタゾン吉草酸エステル"){
+    return("Betamethasone valerate")
+  }
+  
+  else {
+    return("Others")
+  }
+}
+
+convert_ext <- Vectorize(convert_ext)
+```
+
+```{r}
+levels_ext <- convert_ext(ing_top_ext)
+
+levels_ext
+```
+
+
+```{r}
+df_otc_ext <- df_otc_dem %>%
+  filter(TYPE == "ext" & ING %in% ing_top_ext) %>%
+  distinct(YEAR, DRUG_name, SHEET, .keep_all = TRUE) %>%
+  group_by(YEAR,ING) %>%
+  summarise(SUM = sum(TOTAL * COST_per)/10^9) %>%
+  mutate(ING_en = convert_ext(ING) ) %>%
+  mutate(ING_en = factor(ING_en, levels = levels_ext))
+```
+
+
+```{r}
+rkt_otc_ext <- df_otc_ext %>%
+  nest(data = - c(ING_en)) %>%
+ mutate(
+    model = purrr::map(data, ~ rkt(date = .x$YEAR,
+                                 y = .x$SUM)),
+    tau = map_dbl(model, "tau"),
+    p_value = map_dbl(model, "sl"),
+    slope = map_dbl(model, "B")
+  )
+
+rkt_otc_ext
+```
+
+```{r}
+label_otc_ext <- rkt_otc_ext %>%
+  mutate(tau = formatC(tau, digits = 2, format = "fg", flag = "#")) %>%
+  mutate(tau = str_replace(tau, "-", "−")) %>%
+  
+  mutate(p_exp = get_expv(p_value)) %>%
+  mutate(p_num = get_numv(p_value)) %>%
+
+  mutate(slope = round(slope)) %>%
+  mutate(slope = scales::comma(slope)) %>%
+  mutate(slope = str_replace(slope, "-", "−")) %>%
+  
+  mutate(label_slope = paste0("beta == '", slope, "'" )) %>%
+  mutate(label_tau = paste0("tau == '", tau, "'")) %>%
+  mutate(label_p = paste0("italic(p) == '", p_num, "'^'", p_exp, "'")) 
+  
+
+label_otc_ext
+```
+
+```{r}
+label_otc_ext <- label_otc_ext %>%
+  mutate(y_tau = case_when( ING_en %in% levels_ext[1] ~  0.3,
+                            .default = 0.9)) %>%
+  mutate(y_p = case_when(ING_en %in%  levels_ext[1] ~  0.1,
+                         .default = 0.7)) %>%
+  mutate(x = case_when(ING_en %in%  levels_ext[3] ~  (2014 + 2023)/2,
+                       .default = 2015)) %>%
+  mutate(
+         hjust = 0,
+         vjust = 0.5)
+
+label_otc_ext
+```
+
+
+```{r}
+df_y_scale_3 <- df_otc_ext %>%
+  group_by(ING_en) %>%
+  summarise(MAX = max(SUM))
+
+df_y_scale_3
+```
+
+```{r}
+df_y_scale_3 <- df_y_scale_3 %>%
+  mutate(YMAX = 80) %>%
+  mutate(YBRK = 20) %>%
+  arrange(ING_en) %>%
+  bind_cols(tibble(COL = pal_tab10[1:length(levels_ext)]))
+
+df_y_scale_3
+```
+
+```{r}
+# extract
+
+list_p3 <- purrr::map(levels_ext, function(ing){
+
+  ymax <- df_y_scale_3 %>% filter(ING_en == ing) %>% pull(YMAX)
+  ybrk <- df_y_scale_3 %>% filter(ING_en == ing) %>% pull(YBRK)
+  
+  col <- df_y_scale_3 %>% filter(ING_en == ing) %>% pull(COL)
+  
+  label_otc_ext <- label_otc_ext %>%
+    filter(ING_en == ing) %>%
+    mutate(y_tau = ymax * y_tau,
+           y_p = ymax * y_p)
+  
+  
+   df_otc_ext %>%
+     filter(ING_en  == ing) %>%
+    ggplot(aes(YEAR, SUM, group = ING_en))+
+    geom_line(linewidth = 0.3, colour = col)+
+    geom_point(size = 1, colour = col)+
+    labs(title = ing)+
+    theme_classic()+
+        scale_x_continuous(limits = c(2014, 2023),
+                       breaks = seq(2014, 2022, 2))+
+    scale_y_continuous(limits = c(0, ymax),
+                       breaks = seq(0, ymax, ybrk))+
+    
+       geom_text(data = label_otc_ext,
+              aes(x = x, y = y_tau,
+                  hjust = hjust, vjust = vjust,
+                  label = label_tau),
+              size = 2.8, colour = "black",
+              inherit.aes = FALSE,
+              parse = TRUE)+
+    
+      geom_text(data = label_otc_ext,
+              aes(x = x, y = y_p,
+                  hjust = hjust, vjust = vjust,
+                  label = label_p),
+              size = 2.8, colour = "black",
+              inherit.aes = FALSE,
+              parse = TRUE)+
+    
+      labs(title = ing,
+       x = "**Year**",
+       y = "**Cost (×10<sup>9</sup> JPY)**")+
+  theme_classic()+
+  theme(plot.title = element_text(size = 8, colour = "black", face = "bold", hjust = 0.5,
+                                  vjust = 0.5),
+          axis.title.x = element_markdown(size = 8, colour = "black", face = "bold"),
+        axis.title.y = element_markdown(size = 8, colour = "black", face = "bold"),
+        
+          axis.text = element_text(size = 8, colour = "black"),
+          axis.line = element_line(linewidth = 0.3, colour = "black"),
+          axis.ticks = element_line(linewidth = 0.3, colour = "black"),
+          legend.title = element_blank(),
+          legend.text = element_text(size = 8, colour = "black"),
+          legend.key.height = unit(5, "mm"),
+        legend.position = "inside",
+        legend.justification.inside = c(1, 1),
+        legend.position.inside = c(1, 1),
+          plot.margin = margin(1, 1, 1, 1, "mm"))
+    
+})
+```
+
+```{r}
+for (i in 1:length(list_p3 )){
+  print(list_p3[[i]])
+}
+```
+
+```{r}
+
+# 1234
+# 567#
+
+# remove axis in top row
+
+for (i in 1:length(list_p3 )){
+  if(i %in% 1:4){
+    list_p3[[i]] <- list_p3[[i]]+
+      theme(axis.title.x = element_blank(),
+            axis.text.x = element_blank())
+  }
+  else {
+    list_p3[[i]] <- list_p3[[i]]
+  }
+}
+
+# remove y axis for column 2-4
+
+for (i in 1:length(list_p3 )){
+  if(i %in% c(1, 5)) {
+      list_p3[[i]] <- list_p3[[i]]
+  }
+  else {
+      list_p3[[i]] <- list_p3[[i]]+
+        theme(axis.title.y = element_blank(),
+              axis.text.y = element_blank())
+  }
+}
+```
+
+# composition plots
+
+```{r}
+df_oral_comp <- df_otc_dem %>%
+  filter(TYPE == "oral") %>%
+  mutate(ING_en = convert_oral(ING) ) %>%
+  mutate(ING_en = factor(ING_en, levels = c(levels_oral, "Others"))) %>%
+  distinct(YEAR, DRUG_name, SHEET, .keep_all = TRUE) %>%
+  group_by(YEAR,ING_en) %>%
+  summarise(SUM = sum(TOTAL * COST_per)/10^9) 
+```
+
+```{r}
+p4_1 <- df_oral_comp %>%
+  group_by(YEAR) %>%
+  mutate(PCT = SUM/sum(SUM)*100) %>%
+  mutate(ING_en = factor(ING_en, levels = c("Others", rev(levels_oral)))) %>%
+  ggplot(aes(YEAR, PCT , fill = ING_en))+
+  geom_col(width = 0.5, position ="stack")+
+  scale_fill_manual(values = c( "#7f7f7f", rev(pal_tab10[1:8])))+
+  scale_y_continuous(expand = c(0, 0))+
+  labs(tag = "C",
+       title = "Oral",
+       x = "**Year**",
+       y = "**Proportion (%)**")+
+  theme_classic()+
+  theme(plot.tag = element_text(size = 12, colour = "black", face = "bold"),
+        plot.title = element_text(size = 8, colour = "black", face = "bold", hjust = 0.5,
+                                  vjust = 0.5),
+        axis.title.x = element_markdown(size = 8, colour = "black", face = "bold"),
+        axis.title.y = element_markdown(size = 8, colour = "black", face = "bold"),
+        
+          axis.text = element_text(size = 8, colour = "black"),
+          axis.line = element_line(linewidth = 0.3, colour = "black"),
+          axis.ticks = element_line(linewidth = 0.3, colour = "black"),
+          legend.title = element_blank(),
+          legend.text = element_text(size = 8, colour = "black"),
+          legend.key.height = unit(5, "mm"),
+        legend.position = "none",
+        legend.justification.inside = c(1, 1),
+        legend.position.inside = c(1, 1),
+          plot.margin = margin(1, 1, 1, 1, "mm"))
+
+
+
+p4_1
+```
+
+```{r}
+df_ext_comp <- df_otc_dem %>%
+  filter(TYPE == "ext") %>%
+  mutate(ING_en = convert_ext(ING) ) %>%
+  mutate(ING_en = factor(ING_en, levels = c(levels_ext, "Others"))) %>%
+  distinct(YEAR, DRUG_name, SHEET, .keep_all = TRUE) %>%
+  group_by(YEAR,ING_en) %>%
+  summarise(SUM = sum(TOTAL * COST_per)/10^9) 
+```
+
+```{r}
+p4_2 <- df_ext_comp %>%
+  group_by(YEAR) %>%
+  mutate(PCT = SUM/sum(SUM)*100) %>%
+  mutate(ING_en = factor(ING_en, levels = c("Others", rev(levels_ext)))) %>%
+  ggplot(aes(YEAR, PCT , fill = ING_en))+
+  geom_col(width = 0.5, position ="stack")+
+  scale_fill_manual(values = c("#7f7f7f", rev(pal_tab10[1:8])))+
+  scale_y_continuous(expand = c(0, 0))+
+  labs(title = "External",
+       x = "**Year**",
+       y = "**Proportion (%)**")+
+  theme_classic()+
+  theme(plot.title = element_text(size = 8, colour = "black", face = "bold", hjust = 0.5,
+                                  vjust = 0.5),
+          axis.title.x = element_markdown(size = 8, colour = "black", face = "bold"),
+        axis.title.y = element_blank(),
+        
+          axis.text = element_text(size = 8, colour = "black"),
+          axis.line = element_line(linewidth = 0.3, colour = "black"),
+          axis.ticks = element_line(linewidth = 0.3, colour = "black"),
+          legend.title = element_blank(),
+          legend.text = element_text(size = 8, colour = "black"),
+          legend.key.height = unit(5, "mm"),
+        legend.position = "none",
+        legend.justification.inside = c(1, 1),
+        legend.position.inside = c(1, 1),
+          plot.margin = margin(1, 1, 1, 1, "mm"))
+
+p4_2
+```
+
+
+```{r}
+for (i in 1:length(list_p1)){
+  assign(paste0("p1_", i), list_p1[[i]])
+}
+
+for (i in 1:length(list_p2)){
+  assign(paste0("p2_", i), list_p2[[i]])
+}
+
+for (i in 1:length(list_p3)){
+  assign(paste0("p3_", i), list_p3[[i]])
+}
+```
+
+```{r}
+p1_1 <- p1_1 +
+  labs(tag = "A")+
+  theme(plot.tag = element_text(size = 12, colour = "black", face = "bold"))
+
+p2_1 <- p2_1 +
+  labs(tag = "A")+
+  theme(plot.tag = element_text(size = 12, colour = "black", face = "bold"))
+
+p3_1 <- p3_1 +
+  labs(tag = "B")+
+  theme(plot.tag = element_text(size = 12, colour = "black", face = "bold"))
+```
+
+```{r}
+p1 <- p1_1 + p1_2 + p1_3 +
+  plot_layout(ncol = 3)
+```
+
+```{r}
+p123 <- 
+  p2_1 + p2_2 + p2_3 + p2_4 +
+  p2_5 + p2_6 + p2_7 + p2_8 +
+  p3_1 + p3_2 + p3_3 + p3_4 +
+  p3_5 + p3_6 + p3_7 + p3_8 +
+  plot_layout(ncol = 4)
+
+```
+
+```{r}
+p4 <- p4_1 + p4_2 +
+  plot_layout(ncol = 2)
+```
+
+```{r}
+p14 <- p123/p4+
+  plot_layout(heights = c(3, 1))
+
+p14
+```
+
+```{r}
+ggsave("../figure/FigS1.svg", p14, width = 175, height = 185, units = "mm")
+```
+
+
+```{r}
+stop_here
+```

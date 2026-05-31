@@ -1,0 +1,138 @@
+---
+title: "NDB"
+output: html_document
+date: "2026-05-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+# create directories
+
+dir.create("../xlsx/ext", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+dir.create("../xlsx/ext/dem", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+dir.create("../xlsx/ext/prf", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+```
+
+
+```{r}
+# h26 age
+# https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000139847.xlsx
+
+# h27 age
+# https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000177293.xlsx
+
+# h28
+# https://www.mhlw.go.jp/content/12400000/000347796.xlsx
+
+# h29 
+# https://www.mhlw.go.jp/content/12400000/000730517.xlsx
+
+# h30
+# https://www.mhlw.go.jp/content/12400000/000560114.xlsx
+
+# h31
+# https://www.mhlw.go.jp/content/12400000/000821768.xlsx
+
+# r2
+# https://www.mhlw.go.jp/content/12400000/001262345.xlsx
+
+# r3
+# https://www.mhlw.go.jp/content/12400000/001122632.xlsx
+
+# r4
+# https://www.mhlw.go.jp/content/12400000/001258712.xlsx
+
+#
+# https://www.mhlw.go.jp/content/12400000/001495456.xlsx
+
+url_dem <- c("https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000139847.xlsx",
+             "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000177293.xlsx",
+             "https://www.mhlw.go.jp/content/12400000/000347796.xlsx",
+             "https://www.mhlw.go.jp/content/12400000/000730517.xlsx",
+             "https://www.mhlw.go.jp/content/12400000/000560114.xlsx",
+             "https://www.mhlw.go.jp/content/12400000/000821768.xlsx",
+             "https://www.mhlw.go.jp/content/12400000/001262345.xlsx",
+             "https://www.mhlw.go.jp/content/12400000/001122632.xlsx",
+             "https://www.mhlw.go.jp/content/12400000/001258712.xlsx",
+             "https://www.mhlw.go.jp/content/12400000/001495456.xlsx")
+```
+
+```{r}
+file_dem <- url_dem %>% str_extract("00[:digit:]+\\.xlsx")
+
+path_dem <- paste0("../xlsx/ext/dem/", file_dem)
+```
+
+```{r}
+for (i in 1:length(url_dem)){
+  download.file(url_dem[i], path_dem[i], mode = "wb")
+  print(paste(file_dem[i], "downloaded"))
+}
+```
+
+
+```{r}
+# h26 pref
+# https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000139848.xlsx
+
+# h27 pref
+# https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000177294.xlsx
+
+# h28
+# https://www.mhlw.go.jp/content/12400000/000347797.xlsx
+
+# h29
+# https://www.mhlw.go.jp/content/12400000/000730518.xlsx
+
+# h30
+# https://www.mhlw.go.jp/content/12400000/000560115.xlsx
+
+# h31
+# https://www.mhlw.go.jp/content/12400000/000821769.xlsx
+
+# r2
+# https://www.mhlw.go.jp/content/12400000/001262346.xlsx
+
+# r3
+# https://www.mhlw.go.jp/content/12400000/001122633.xlsx
+
+# r4
+# https://www.mhlw.go.jp/content/12400000/001258713.xlsx
+
+#
+# https://www.mhlw.go.jp/content/12400000/001495457.xlsx
+
+url_prf <- c(
+  "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000139848.xlsx",
+  "https://www.mhlw.go.jp/file/06-Seisakujouhou-12400000-Hokenkyoku/0000177294.xlsx",
+  "https://www.mhlw.go.jp/content/12400000/000347797.xlsx",
+  "https://www.mhlw.go.jp/content/12400000/000730518.xlsx",
+  "https://www.mhlw.go.jp/content/12400000/000560115.xlsx",
+  "https://www.mhlw.go.jp/content/12400000/000821769.xlsx",
+  "https://www.mhlw.go.jp/content/12400000/001262346.xlsx",
+  "https://www.mhlw.go.jp/content/12400000/001122633.xlsx",
+  "https://www.mhlw.go.jp/content/12400000/001258713.xlsx",
+  "https://www.mhlw.go.jp/content/12400000/001495457.xlsx"
+)
+```
+
+```{r}
+file_prf <- url_prf %>% str_extract("00[:digit:]+\\.xlsx")
+
+path_prf <- paste0("../xlsx/ext/prf/", file_prf)
+```
+
+```{r}
+for (i in 1:length(url_prf)){
+  download.file(url_prf[i], path_prf[i], mode = "wb")
+  print(paste(file_prf[i], "downloaded"))
+}
+```
+
