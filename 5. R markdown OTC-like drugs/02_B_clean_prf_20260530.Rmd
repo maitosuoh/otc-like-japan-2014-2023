@@ -1,0 +1,296 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-10-16"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(openxlsx)
+```
+
+
+```{r}
+# make df folder
+
+dir.create("../df/clean", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+```
+
+```{r}
+# make df folder
+
+dir.create("../df/clean/prf", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+
+dir.create("../df/clean/prf", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+```
+
+```{r}
+file_comb <- list.files("../df/combine/prf") %>% str_subset("oral|inj|ext") %>%
+  str_remove("\\.RDS")
+
+file_comb
+```
+
+```{r}
+path_comb <- paste0("../df/combine/prf/", file_comb, ".RDS")
+```
+
+
+```{r}
+for (i in 1:length(file_comb)){
+  assign(file_comb[i], readRDS(path_comb[i]))
+}
+```
+
+```{r}
+df_oral_prf %>% filter(is.na(ING)) %>% nrow()
+
+df_inj_prf %>% filter(is.na(ING)) %>% nrow()
+
+df_ext_prf %>% filter(is.na(ING)) %>% nrow()
+
+```
+
+
+```{r}
+df_inj_prf %>% filter(is.na(ING)) %>% View()
+
+# 6399425D1024
+```
+
+
+```{r}
+df_inj_prf %>% filter(COST_code == "6399425D1024")
+
+# トラスツズマブ エムタンシン
+```
+
+```{r}
+df_inj_prf %>% filter(str_detect(ING, "トラスツズマブ")) %>%
+  count(ING)
+```
+
+```{r}
+df_inj_prf %>% filter(str_detect(ING, "トラスツズマブ　エムタンシン")) %>%
+  count(DRUG_name, COST_code)
+```
+
+
+```{r}
+df_inj_prf <- df_inj_prf %>%
+  mutate(ING = case_when(COST_code == "6399425D1024" ~ "トラスツズマブ　エムタンシン（遺伝子組換え）",
+         .default = ING))
+```
+
+```{r}
+# check brakets
+
+df_inj_prf %>% filter(str_detect(ING, "［|］")) %>%
+  count(ING) %>% View()
+```
+
+
+```{r}
+# remove after barkets
+
+
+df_inj_prf <- df_inj_prf %>% mutate(ING = str_remove(ING, "［.+")) 
+```
+
+# check oral
+
+```{r}
+df_oral_prf %>% filter(is.na(ING)) %>% count(DRUG_name) %>% View()
+```
+
+```{r}
+df_oral_prf %>% filter(str_detect(DRUG_name, "炭酸水素ナトリウム"))　%>%
+  count(ING)
+```
+
+```{r}
+df_oral_prf %>% filter(str_detect(DRUG_name, "モルヒネ硫酸塩"))　%>%
+  count(DRUG_name, ING, COST_code)
+```
+
+```{r}
+# アリピプラゾール -> アリピプラゾール
+# サラゾスルファピリジン -> サラゾスルファピリジン
+# デキストロメトルファン -> デキストロメトルファン臭化水素酸塩水和物
+# トリクロルメチアジド -> トリクロルメチアジド
+# フェブキソスタット ->	フェブキソスタット
+# ミグリトール -> ミグリトール
+# 炭酸水素ナトリウム -> 炭酸水素ナトリウム
+
+# ヤーズ配合錠 -> ドロスピレノン・エチニルエストラジオール　ベータデクス
+
+# モルヒネ硫酸塩 -> モルヒネ硫酸塩水和物
+# MSツワイスロン -> モルヒネ硫酸塩水和物
+```
+
+```{r}
+df_oral_prf %>% filter(str_detect(ING, "デキストロメトルファン"))　%>%
+  count(DRUG_name, ING)
+```
+
+```{r}
+#ドロスピレノン エチニルエストラジオール　ベータデクス
+
+df_oral_prf %>% filter(str_detect(ING, "ドロスピレノン"))　%>%
+  count(DRUG_name, ING)
+```
+
+```{r}
+df_oral_prf %>%
+  filter(DRUG_name == "ヤーズ配合錠") %>%
+  count(DRUG_name,COST_code, ING) %>% View()
+```
+
+
+```{r}
+# アリピプラゾール -> アリピプラゾール
+# サラゾスルファピリジン -> サラゾスルファピリジン
+# デキストロメトルファン -> デキストロメトルファン臭化水素酸塩水和物
+# トリクロルメチアジド -> トリクロルメチアジド
+# フェブキソスタット ->	フェブキソスタット
+# ミグリトール -> ミグリトール
+# 炭酸水素ナトリウム -> 炭酸水素ナトリウム
+
+# ヤーズ配合錠 -> ドロスピレノン・エチニルエストラジオール　ベータデクス
+
+# モルヒネ硫酸塩 -> モルヒネ硫酸塩水和物
+# MSツワイスロン -> モルヒネ硫酸塩水和物
+
+
+df_oral_prf <- df_oral_prf %>%
+  mutate(ING = case_when(is.na(ING) & str_detect(DRUG_name, "アリピプラゾール") ~ "アリピプラゾール",
+                         is.na(ING) & str_detect(DRUG_name, "サラゾスルファピリジン") ~ "サラゾスルファピリジン",
+                         is.na(ING) & str_detect(DRUG_name, "デキストロメトルファン") ~ "デキストロメトルファン臭化水素酸塩水和物",
+                         
+                         is.na(ING) & str_detect(DRUG_name, "トリクロルメチアジド") ~ "トリクロルメチアジド",
+                         is.na(ING) & str_detect(DRUG_name, "フェブキソスタット") ~ "フェブキソスタット",
+                         is.na(ING) & str_detect(DRUG_name, "ミグリトール") ~ "ミグリトール",
+                         is.na(ING) & str_detect(DRUG_name, "炭酸水素ナトリウム") ~ "炭酸水素ナトリウム",
+                         
+                         is.na(ING) & DRUG_name == "ヤーズ配合錠" ~ "ドロスピレノン・エチニルエストラジオール　ベータデクス",
+                         is.na(ING) & str_detect(DRUG_name, "モルヒネ硫酸塩|ＭＳツワイスロンカプセル") ~ "モルヒネ硫酸塩水和物",
+                         .default = ING))
+
+```
+
+```{r}
+df_oral_prf %>% filter(is.na(ING)) %>% count(DRUG_name, ING)
+```
+
+
+
+```{r}
+df_ext_prf %>% filter(is.na(ING)) %>% nrow()
+
+# zero
+```
+
+# check annual cost
+
+```{r}
+df_oral_prf %>%
+  mutate(across(c(COST_per, TOTAL), ~as.numeric(.x))) %>%
+  filter(!is.na(TOTAL)) %>%
+  group_by(YEAR_str) %>%
+  summarise(SUM = sum(COST_per * TOTAL)) %>%
+  ggplot(aes(YEAR_str, SUM)) +
+  geom_col(width = 0.7)+
+  scale_y_continuous(limits = c(0, NA))+
+  theme_classic()
+```
+
+```{r}
+df_inj_prf %>%
+  group_by(YEAR_str) %>%
+  summarise(SUM = sum(COST_per * TOTAL)) %>%
+  ggplot(aes(YEAR_str, SUM)) +
+  geom_col(width = 0.7)+
+  scale_y_continuous(limits = c(0, NA))+
+  theme_classic()
+
+# sudden increase in 2025
+```
+
+```{r}
+df_inj_prf %>%
+  filter(YEAR_str == "2023") %>%
+  group_by(ING) %>%
+  summarise(SUM = sum(COST_per * TOTAL)) %>%
+  slice_max(SUM, n = 10) %>%
+  ggplot(aes(SUM, fct_reorder(ING, SUM)))+
+  geom_col(width = 0.7)+
+    scale_x_continuous(limits = c(0, NA))+
+  theme_classic()
+```
+
+
+```{r}
+df_inj_prf %>%
+  filter(YEAR_str == "2023") %>%
+  group_by(DRUG_name) %>%
+  summarise(SUM = sum(COST_per * TOTAL)) %>%
+  slice_max(SUM, n = 10) %>%
+  ggplot(aes(SUM, fct_reorder(DRUG_name, SUM)))+
+  geom_col(width = 0.7)+
+    scale_x_continuous(limits = c(0, NA))+
+  theme_classic()
+``` 
+
+```{r}
+df_inj_prf %>%
+  filter(YEAR_str == "2023") %>%
+  group_by(DRUG_name) %>%
+  summarise(SUM = sum(COST_per * TOTAL)) %>%
+  slice_max(SUM, n = 10)
+```
+
+```{r}
+df_inj_prf %>%
+  filter(str_detect(DRUG_name, "イオパミドール３７０注シリンジ１００ｍＬ「ＦＦ」")) %>%
+  group_by(YEAR_str) %>%
+  summarise(SUM = sum(TOTAL))
+
+# sudden increase -> possibly error
+```
+
+```{r}
+df_inj_prf %>%
+  filter(str_detect(DRUG_name, "イオパミドール３７０注シリンジ１００ｍＬ「ＦＦ」")) %>% View()
+
+# 621782301
+
+```
+
+```{r}
+df_inj_prf %>%
+  filter(! (str_detect(DRUG_code, "621782301") &
+              YEAR == "2023" &
+              SHEET == "inpt")) %>%
+  nrow()
+```
+
+
+```{r}
+df_inj_prf <-  df_inj_prf %>%
+  filter(! (str_detect(DRUG_code, "621782301") &
+              YEAR == "2023" &
+              SHEET == "inpt"))
+```
+
+```{r}
+saveRDS(df_oral_prf, "../df/clean/prf/df_oral_prf.RDS")
+
+saveRDS(df_inj_prf, "../df/clean/prf/df_inj_prf.RDS")
+
+saveRDS(df_ext_prf, "../df/clean/prf/df_ext_prf.RDS")
+```
