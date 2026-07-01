@@ -1,0 +1,683 @@
+---
+title: "OTC-like drugs"
+output: html_document
+date: "2026-05-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(openxlsx)
+
+library(stringi)
+library(ggh4x)
+
+library(cowplot)
+library(patchwork)
+library(ggtext)
+library(ggrepel)
+
+library(rkt)
+library(ggh4x)
+```
+
+```{r}
+options(knitr.df_print = rmarkdown::paged_table)
+```
+
+
+```{r}
+# make df folder
+
+dir.create("../df/format", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+```
+
+```{r}
+# make df folder
+
+dir.create("../df/format/dem", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+
+dir.create("../df/format/prf", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+```
+
+```{r}
+file_dem <- list.files("../df/filter/dem") %>% str_remove("\\.RDS")
+
+file_dem
+
+path_dem <- paste0("../df/filter/dem/", file_dem , ".RDS")
+```
+
+```{r}
+file_prf <- list.files("../df/filter/prf") %>% str_remove("\\.RDS")
+
+file_prf
+
+path_prf <- paste0("../df/filter/prf/", file_prf , ".RDS")
+```
+
+```{r}
+file_all <- c(file_dem, file_prf)
+
+path_all <- c(path_dem, path_prf)
+```
+
+```{r}
+df_1 <- readRDS(path_all[1])
+```
+
+
+```{r}
+list_df <- purrr::map(path_dem, function(x){
+  
+  df <- readRDS(x) %>%
+    pivot_longer(cols = c(starts_with("M_"), starts_with("F_")),
+              names_to = "SEX_AGE",
+              values_to = "VALUE")
+
+  df <- df  %>%
+    mutate(SEX = str_extract(SEX_AGE, "^M|^F")) %>%
+    mutate(AGE = str_remove(SEX_AGE, "^M_|^F_"))
+  
+  df <- df  %>%
+    mutate(SEX = case_when(SEX == "M" ~ "Male",
+                         SEX == "F" ~ "Female")) %>%
+    mutate(SEX = factor(SEX, levels = c("Male", "Female")))
+  
+  levels_age <- df %>% distinct(AGE) %>%
+    mutate(AGE = str_replace_all(AGE, "_", "–")) %>%
+    pull(AGE)
+  
+  df <- df  %>%
+      mutate(AGE = str_replace(AGE, "_", "–")) %>%
+    mutate(AGE = fct_other(AGE,
+                         keep = as.character(levels_age[1:18]),
+                         other_level = "90–"))
+  
+  
+#   df <- df %>% 
+#  mutate(AGE = str_replace(AGE, "_", "–")) %>%
+#  mutate(AGE = factor(AGE, levels = levels_age))
+  
+  df <- df %>%
+    mutate(across(c(TOTAL, VALUE), ~ str_replace(.x, "-", "0"))) %>%
+    mutate(across(c(TOTAL, VALUE), ~ as.numeric(.x))) %>%
+    mutate(across(c(TOTAL, VALUE), ~ replace_na(.x, 0)))
+  
+  return(df)
+  
+})
+```
+
+
+```{r}
+for (i in 1:length(file_dem)){
+  assign(file_dem[i], list_df[[i]])
+}
+```
+
+```{r}
+df_otc_dem <- df_oral_dem %>%
+  bind_rows(df_ext_dem)
+```
+
+```{r}
+df_otc_dem %>%
+  distinct(AGE) %>% pull(AGE)
+```
+
+
+```{r}
+df_otc_dem <- df_otc_dem %>%
+  mutate(AGE_ori = AGE) %>%
+  mutate(AGE = fct_recode(AGE,
+                          "0–4" = "0–4",
+                          "5–9" = "5–9",
+                          "10–14" = "10–14",
+                          "15–19" ="15–19",
+                          "20–69" = "20–24",
+                          "20–69" = "25–29",
+                          "20–69" = "30–34",
+                          "20–69" = "35–39",
+                          "20–69" = "40–44",
+                          "20–69" = "45–49",
+                          "20–69" = "50–54",
+                          "20–69" = "55–59",
+                          "20–69" = "60–64",
+                          "20–69" = "65–69", 
+                          "70–74" = "70–74", 
+                          "75–" = "75–79",
+                          "75–" = "80–84",
+                          "75–" = "85–89",
+                          "75–" = "90–"))
+```
+
+
+
+
+```{r}
+levels_age_new <- df_otc_dem %>%
+  distinct(AGE) %>% pull(AGE) %>% as.character()
+
+levels_age_new
+```
+```{r}
+df_otc_dem <- df_otc_dem %>%
+  mutate(AGE = factor(AGE, levels = levels_age_new))
+```
+
+
+# dem
+
+
+```{r}
+df_pop_dem <- readRDS("../rds/pop/dem/df_pop_dem")
+```
+
+```{r}
+df_pop_dem_long <- df_pop_dem %>%
+  filter(AGE != "total") %>%
+  select(YEAR, AGE, ALL_total, ALL_m, ALL_f) %>%
+  pivot_longer(cols = starts_with("ALL_"),
+               names_to = "SEX",
+               values_to = "POP")
+```
+
+```{r}
+df_pop_dem_long <- df_pop_dem_long %>%
+  mutate(SEX= str_remove(SEX, "ALL_")) %>%
+  mutate(SEX = case_when(SEX == "total" ~ "All",
+                         SEX == "m" ~ "Male",
+                         SEX == "f" ~ "Female")) 
+```
+
+```{r}
+df_pop_dem_cat <- df_pop_dem_long %>%
+  mutate(AGE_ori = AGE) %>%
+  mutate(AGE = str_remove(AGE, "_$")) %>%
+  mutate(AGE = as.numeric(AGE)) %>%
+  mutate(AGE = case_when(AGE %in% 0:4 ~ "0–4",
+                         AGE %in% 5:9 ~ "5–9",
+                         AGE %in% 10:14 ~ "10–14",
+                         AGE %in% 15:19 ~ "15–19",
+                         AGE %in% 20:69 ~ "20–69",
+                         AGE %in% 70:74 ~ "70–74",
+                         AGE >= 75 ~ "75–",
+                         .default = NA
+                         ))
+
+# 0–14  15–19 20–69 70–74 75–  
+
+```
+
+#
+
+```{r}
+get_exp <- function(x){
+
+  if (x > 0.001){
+    
+    return("")
+  }
+  
+  else {
+  
+    p <- formatC(x, digits = 1, format = "e", flag = "#")
+    
+    ex <- p %>% str_extract("(?<=e).+") %>%
+      str_remove_all("(?<=\\-)0+") %>%
+      str_replace("-", "−")
+    
+    return(ex)
+  }
+}
+
+get_expv <- Vectorize(get_exp)
+```
+
+```{r}
+get_num <- function(x){
+
+    if (x > 0.001){
+    
+      p <- formatC(x, digits = 2, format = "fg", flag = "#")
+      
+      return(p)
+  }
+  
+  else {
+  
+    p <- formatC(x, digits = 1, format = "e", flag = "#")
+    
+    num <- p %>% str_extract(".+(?=e)")
+    
+    num <- str_c(num, "×10")
+      
+    return(num)
+  }
+}
+
+get_numv <- Vectorize(get_num)
+```
+
+```{r}
+df_pop_dem_sa <- df_pop_dem_cat %>%
+  group_by(YEAR, AGE, SEX) %>%
+  summarise(POP = sum(POP)) %>%
+  ungroup() %>%
+  mutate(ID = paste0(YEAR, "_", SEX, "_", AGE))
+
+df_pop_dem_sa
+```
+
+
+# start analysis
+
+
+```{r}
+# Ｌ－カルボシステイン
+
+df_otc_dem <- df_otc_dem %>%
+  mutate(ING = str_remove(ING, "Ｌ－"))
+```
+
+
+
+```{r}
+df_otc_dem <- df_otc_dem %>%
+  filter(SHEET != "inpt")
+```
+
+
+```{r}
+df_dem_total <- df_otc_dem %>%
+  distinct(DRUG_name, YEAR, SHEET, ING, .keep_all = TRUE) %>%
+  group_by(YEAR, TYPE, ING) %>%
+    summarise(SUM = sum(VALUE * COST_per)) %>%
+  mutate(ID = paste0(YEAR, "_", ING, "_", TYPE))
+```
+
+
+
+```{r}
+df_dem_value <- df_otc_dem %>%
+  group_by(YEAR, TYPE) %>%
+  summarise(SUM = sum(VALUE * COST_per)) %>%
+  mutate(ID = paste0(YEAR, "_", "_", TYPE))
+```
+
+# top oral drug
+# overall
+
+```{r}
+df_otc_dem %>%
+  group_by(YEAR, SEX, AGE) %>%
+  summarise(SUM = sum(VALUE * COST_per)/10^9) %>%
+  bind_rows(df_otc_dem %>%
+              group_by(YEAR, AGE) %>%
+              summarise(SUM = sum(VALUE * COST_per)/10^9) %>%
+              mutate(SEX = "All")) %>%
+  mutate(SEX = factor(SEX, levels = c("All", "Male", "Female"))) %>%
+  
+  mutate(YEAR = as.factor(YEAR)) %>%
+  ggplot(aes( YEAR, SUM, group = SEX, colour = SEX )) +
+  geom_line(linewidth = 0.3)+
+  scale_color_manual(values = c("black", "#1f77b4", "#d62728"))+
+  facet_wrap2(vars(AGE), nrow = 1)+
+  theme_classic()
+```
+
+
+
+```{r}
+# raw cost
+
+df_otc_raw <- df_otc_dem %>%
+  group_by(YEAR, SEX, AGE) %>%
+  summarise(SUM = sum(VALUE * COST_per)/10^9) %>%
+  bind_rows(df_otc_dem %>%
+              group_by(YEAR, AGE) %>%
+              summarise(SUM = sum(VALUE * COST_per)/10^9) %>%
+              mutate(SEX = "All")) %>%
+  mutate(SEX = factor(SEX, levels = c("All", "Male", "Female"))) %>%
+  mutate(CAT = "sum")
+```
+
+
+```{r}
+# adjust and convert to million
+
+df_otc_adj <- df_otc_raw %>%
+  mutate(ID = paste0(YEAR, "_", SEX,  "_", AGE)) %>%
+  left_join(df_pop_dem_sa %>% select(ID, POP),
+            by = join_by(ID)) %>%
+  mutate(SUM = SUM * 10^9/(POP * 10^3)) %>%
+  mutate(CAT = "adj")
+```
+
+```{r}
+df_otc_ra <- df_otc_raw %>%
+  bind_rows(df_otc_adj) %>%
+  mutate(CAT = factor(CAT, levels = c("sum", "adj")))
+
+df_otc_ra 
+```
+
+```{r}
+#
+labeller_otc_ra <- c("sum" = "Cost (×10<sup>9</sup> JPY)",
+                     "adj"= "Cost (JPY/person)")
+```
+
+```{r}
+list_scale_y <- list(
+  CAT == "sum" ~ scale_y_continuous(limits = c(0, 150),
+                                    breaks = seq(0, 150, 50),
+                                    labels = scales::label_comma()),
+  
+  CAT == "adj" ~ scale_y_continuous(limits = c(0, 6000),
+                                    breaks = seq(0, 6000, 1000),
+                                    labels = scales::label_comma())
+)
+```
+
+
+
+```{r}
+p1 <- df_otc_ra %>%
+    ggplot(aes( YEAR, SUM, group = SEX, colour = SEX )) +
+  geom_line(linewidth = 0.3)+
+  scale_color_manual(values = c("black", "#1f77b4", "#d62728"))+
+  facet_grid2(rows = vars(CAT),
+              cols = vars(AGE),
+              labeller = labeller(CAT = labeller_otc_ra),
+              switch = "y",
+              scales = "free_y",
+              axes = "all",
+              remove_labels = "all")+
+  scale_x_continuous(limits = c(2014, 2023),
+                     breaks = seq(2014, 2022, 4),
+                     labels = c("2014", "2018",  "2022"))+
+  ggh4x::facetted_pos_scales(y = list_scale_y)+
+  guides(colour = guide_legend(override.aes = list(linewidth = 0.5) ) )+
+  labs(tag = "A",
+       x = "Year", y = "Cost")+
+  theme_classic()+
+  theme(plot.tag = element_text(size = 12, colour = "black", face = "bold"),
+        plot.title = element_text(size = 8, colour = "black", face = "bold", hjust = 0.5),
+        strip.placement = "outside",
+        strip.background = element_blank(),
+        strip.text.x = element_text(size = 8, colour = "black", face = "bold",
+                                    margin = margin(0, 0, 1, 0, unit = "mm")),
+        strip.text.y.left = element_markdown(size = 8, colour ="black", face ="bold",
+                                             margin = margin(0, 0, 0, 0, "pt")),
+        
+          axis.title.x = element_markdown(size = 8, colour = "black", face = "bold"),
+        axis.title.y = element_blank(),
+                  axis.text.x = element_text(size = 8, colour = "black"),
+          axis.text.y = element_text(size = 8, colour = "black"),
+          axis.line = element_line(linewidth = 0.3, colour = "black"),
+          axis.ticks = element_line(linewidth = 0.3, colour = "black"),
+                  legend.title =element_blank(),
+          legend.text = element_text(size = 8, colour = "black"),
+        legend.key.height = unit(5, "mm"),
+        legend.key.spacing.y = unit(0, "mm"),
+        legend.key = element_blank(),
+        legend.position = "inside",
+        legend.justification.inside = c(0, 1),
+        legend.background = element_blank(),
+        legend.position.inside = c(0.01, 1),
+        panel.spacing = unit(3, "mm"),
+        legend.margin = margin(0, 0, 0, 0, "mm"),
+        legend.box.margin = margin(0, 0, 0, 0, "mm"),
+        legend.box.background = element_blank(),
+          plot.margin = margin(0, 0, 0, 0, "mm"))
+
+p1
+```
+
+# rkt
+
+```{r}
+rkt_otc_ra <- df_otc_ra %>%
+  nest(data = - c(SEX, AGE, CAT)) %>%
+ mutate(
+    model = purrr::map(data, ~ rkt(date = .x$YEAR,
+                                 y = .x$SUM)),
+    tau = map_dbl(model, "tau"),
+    p_value = map_dbl(model, "sl"),
+    slope = map_dbl(model, "B")
+  )
+
+rkt_otc_ra 
+```
+
+
+```{r}
+get_exp <- function(x){
+
+  if (x > 0.001){
+    
+    return("")
+  }
+  
+  else {
+  
+    p <- formatC(x, digits = 1, format = "e", flag = "#")
+    
+    ex <- p %>% str_extract("(?<=e).+") %>%
+      str_remove_all("(?<=\\-)0+") %>%
+      str_replace("-", "−")
+    
+    return(ex)
+  }
+}
+
+get_expv <- Vectorize(get_exp)
+```
+
+```{r}
+get_num <- function(x){
+
+    if (x > 0.001){
+    
+      p <- formatC(x, digits = 2, format = "fg", flag = "#")
+      
+      return(p)
+  }
+  
+  else {
+  
+    p <- formatC(x, digits = 1, format = "e", flag = "#")
+    
+    num <- p %>% str_extract(".+(?=e)")
+    
+    num <- str_c(num, "×10")
+      
+    return(num)
+  }
+}
+
+get_numv <- Vectorize(get_num)
+```
+
+```{r}
+df_otc_hm <- rkt_otc_ra  %>%
+   mutate(tau_label = formatC(tau, digits = 2, format = "fg", flag = "#")) %>%
+  mutate(tau_label = str_replace(tau_label, "-", "−")) %>%
+  mutate(tau_label = paste0("'", tau_label, "'")) %>%
+  
+  mutate(p_num = get_numv(p_value),
+         p_exp = get_expv(p_value)) %>%
+  
+  mutate(p_num = str_replace(p_num, "×", "%*%")) %>%
+  
+  mutate(p_num = case_when(p_exp == "" ~ paste0("{'", p_num,  "'}"),
+                          .default = p_num)) %>%
+  
+  mutate(p_exp= case_when(p_exp != "" ~ paste0("^{'", p_exp,  "'}"),
+                          .default = p_exp)) %>%
+  mutate(p_label = paste0("italic(p) == ", p_num, p_exp)) 
+
+df_otc_hm
+```
+
+```{r}
+df_otc_hm <- df_otc_hm %>%
+  mutate(SEX = factor(SEX, levels = c("Female", "Male", "All"))) %>%
+  mutate(CAT = factor(CAT, levels = c("sum", "adj")))
+```
+
+
+```{r}
+p2 <- df_otc_hm %>%
+  mutate(X = "tau") %>%
+#  mutate(p_label = paste0("(", p_label, ")")) %>%
+  
+   ggplot(aes(AGE, SEX , fill = tau))+
+  geom_tile(linewidth = 0.3, colour = "black")+
+  scale_fill_gradient2(low = "#74add1",
+                      mid  = "white",
+                      high = "#f46d43",
+                      limits = c(-1, 1),
+                      name = expression(tau))+
+  geom_text(aes(
+                label = tau_label),
+            nudge_y = 0.2,
+            size = 2.8, colour = "black",
+            parse = TRUE)+
+  
+  geom_text(aes(
+                label = p_label),
+            nudge_y = -0.2,
+            size = 2.8, colour = "black",
+            parse = TRUE)+
+  
+  scale_x_discrete(expand = c(0, 0))+
+  scale_y_discrete(expand = c(0, 0))+
+  coord_cartesian(clip = "off")+
+  facet_grid2(cols = vars(X),
+              rows = vars(CAT),
+             scales = "free_y",
+              space = "free_y",
+             switch = "y",
+             labeller = labeller(CAT = labeller_otc_ra)
+               )+
+  guides(fill = guide_colourbar(ticks.colour = "black",
+                                ticks.linewidth = 0.2,
+                                frame.colour = "black",
+                                frame.linewidth = 0.2)) +
+  labs(tag = "B",
+       y = "Sex",
+       x = "Age")+
+    theme_classic()+
+    theme(plot.tag = element_text(size = 12, colour = "black", face = "bold"),
+          strip.placement = "outside",
+          strip.background = element_blank(),
+          
+          strip.text.x = element_blank(),
+          strip.text.y.left = element_markdown(size = 8, colour = "black", face = "bold",
+                                               margin = margin(0, 0, 0, 0, "pt")),
+          axis.title.x = element_text(size = 8, colour = "black", face = "bold"),
+          axis.text.x = element_text(size = 8, colour = "black"),
+          axis.title.y = element_blank(),
+          axis.text.y = element_text(size = 8, colour = "black"),
+          axis.line = element_blank(),
+          axis.ticks = element_blank(),
+          legend.title = element_text(size = 8, colour = "black", face = "bold"),
+          legend.text = element_text(size = 8, colour = "black"),
+          legend.key.height = unit(1.25, "lines"),
+          legend.key.width = unit(0.75, "lines"),
+          plot.margin = margin(0, 0, 0, 0, "mm"),
+          panel.border = element_rect(linewidth = 0.3, colour = "black"),
+          legend.margin = margin(0, 0, 0, 0, "mm"),
+          legend.box.margin = margin(0, 0, 0, 0, "mm"),
+          legend.box.spacing = unit(3, "mm"),
+          panel.spacing = unit(3, "mm"))
+
+p2
+```
+
+```{r}
+p12 <- p1 + free(p2) +
+  plot_layout(heights  = c(4, 3))
+
+ggsave("../figure/Fig3.pdf", p12,
+       width = 175, height = 175,
+       units = "mm")
+```
+
+
+
+```{r}
+s2 <- df_otc_ra %>%
+  mutate(YEAR = as.factor(YEAR)) %>%
+  mutate(AGE = factor(AGE, levels = rev(levels_age_new))) %>%
+  filter(CAT == "adj") %>%
+  ggplot(aes(YEAR, AGE, fill = SUM))+
+  geom_tile(linewidth = 0.3, colour = "black")+
+  scale_fill_gradient(# low = "#74add1",
+                      low  = "white",
+                      high = "#E64626",
+                      limits = c(0, 6000),
+                      breaks = seq(0, 6000, 1000),
+                      labels =  seq(0, 6000, 1000) %>% scales::comma(),
+                      name = "Cost\n(JPY/person)")+
+  geom_text(aes(label = round(SUM) %>% scales::comma()),
+            size = 2.8, colour = "black")+
+  facet_wrap(vars(SEX),
+             ncol = 1,
+             strip.position = "left")+
+    scale_x_discrete(expand = c(0, 0))+
+  scale_y_discrete(expand = c(0, 0))+
+  coord_cartesian(clip = "off")+
+  
+    guides(fill = guide_colourbar(ticks.colour = "black",
+                                ticks.linewidth = 0.2,
+                                frame.colour = "black",
+                                frame.linewidth = 0.2)) +
+  labs(# tag = "B",
+       y = "Sex",
+       x = "Year")+
+  theme_classic()  +
+  theme(
+          strip.placement = "outside",
+          strip.background = element_blank(),
+          
+          strip.text.x = element_blank(),
+          strip.text.y.left = element_markdown(size = 8, colour = "black", face = "bold",
+                                               margin = margin(0, 0, 0, 0, "mm")),
+          axis.title.x = element_text(size = 8, colour = "black", face = "bold"),
+          axis.text.x = element_text(size = 8, colour = "black"),
+          axis.title.y = element_blank(),
+          axis.text.y = element_text(size = 8, colour = "black"),
+          axis.line = element_blank(),
+          axis.ticks = element_blank(),
+          legend.title = element_text(size = 8, colour = "black", face = "bold"),
+          legend.text = element_text(size = 8, colour = "black"),
+          legend.key.height = unit(1.5, "lines"),
+          legend.key.width = unit(0.75, "lines"),
+          plot.margin = margin(0, 0, 0, 0, "mm"),
+          panel.border = element_rect(linewidth = 0.3, colour = "black"),
+          legend.margin = margin(0, 0, 0, 0, "mm"),
+          legend.box.margin = margin(0, 0, 0, 0, "mm"),
+          legend.box.spacing = unit(4, "mm"),
+          panel.spacing = unit(3, "mm"))
+
+s2 
+```
+
+```{r}
+s2 <- s2 + plot_layout()
+
+ggsave("../figure/FigS1.svg", s2,
+        width = 175, height = 175,
+       units = "mm")
+```
+
